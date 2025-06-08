@@ -1,0 +1,3010 @@
+# GemsAI Database Deployment - Copy & Paste Guide
+
+Open this file and copy each block to Supabase SQL Editor
+Dashboard: https://supabase.com/dashboard/project/lpyyznmdheipnenrytte
+
+================================================================================
+
+STEP 0: Extensions (Run First)
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+CREATE EXTENSION IF NOT EXISTS "unaccent";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
+================================================================================
+
+STEP 1: Internationalization Schema
+
+-- GemsAI Internationalization Database Schema
+-- Comprehensive multilingual support with Hebrew-first approach
+
+-- Enable necessary extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================================================
+-- CORE LANGUAGE MANAGEMENT
+-- ============================================================================
+
+-- Languages table - Defines supported languages
+CREATE TABLE IF NOT EXISTS languages (
+    id VARCHAR(5) PRIMARY KEY, -- 'he', 'en', etc.
+    name JSONB NOT NULL, -- {"he": "עברית", "en": "Hebrew"}
+    direction VARCHAR(3) NOT NULL CHECK (direction IN ('ltr', 'rtl')),
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create unique constraint for default language
+CREATE UNIQUE INDEX IF NOT EXISTS languages_default_unique 
+ON languages (is_default) WHERE is_default = TRUE;
+
+-- Insert default languages
+INSERT INTO languages (id, name, direction, is_default, is_active, sort_order) VALUES
+('he', '{"he": "עברית", "en": "Hebrew"}', 'rtl', TRUE, TRUE, 1),
+('en', '{"he": "אנגלית", "en": "English"}', 'ltr', FALSE, TRUE, 2)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================================
+-- TRANSLATION METADATA MANAGEMENT
+-- ============================================================================
+
+-- Translation metadata - Tracks translation status for entities
+CREATE TABLE IF NOT EXISTS translation_metadata (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entity_type VARCHAR(50) NOT NULL, -- 'story', 'product', 'jeweler'
+    entity_id UUID NOT NULL,
+    language_id VARCHAR(5) NOT NULL REFERENCES languages(id),
+    is_original BOOLEAN NOT NULL DEFAULT FALSE,
+    translation_status VARCHAR(20) NOT NULL DEFAULT 'draft' 
+        CHECK (translation_status IN ('draft', 'pending', 'approved', 'published')),
+    translator_id UUID, -- Reference to users table if needed
+    translation_quality_score INTEGER CHECK (translation_quality_score BETWEEN 1 AND 100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(entity_type, entity_id, language_id)
+);
+
+-- Indexes for translation metadata
+CREATE INDEX IF NOT EXISTS idx_translation_metadata_entity ON translation_metadata(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_translation_metadata_language ON translation_metadata(language_id);
+CREATE INDEX IF NOT EXISTS idx_translation_metadata_status ON translation_metadata(translation_status);
+
+-- ============================================================================
+-- CONTENT TRANSLATION TABLES
+-- ============================================================================
+
+-- Story translations
+CREATE TABLE IF NOT EXISTS story_translations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    story_id UUID NOT NULL, -- References stories.id
+    language_id VARCHAR(5) NOT NULL REFERENCES languages(id),
+    title TEXT,
+    content TEXT NOT NULL,
+    summary TEXT,
+    emotion_tags TEXT[],
+    seo_title VARCHAR(100),
+    seo_description VARCHAR(300),
+    slug VARCHAR(200),
+    reading_time_minutes INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(story_id, language_id)
+);
+
+-- Product translations
+CREATE TABLE IF NOT EXISTS product_translations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL, -- References products.id
+    language_id VARCHAR(5) NOT NULL REFERENCES languages(id),
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    short_description VARCHAR(500),
+    materials_description TEXT,
+    care_instructions TEXT,
+    style_tags TEXT[],
+    seo_title VARCHAR(100),
+    seo_description VARCHAR(300),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(product_id, language_id)
+);
+
+-- Jeweler translations
+CREATE TABLE IF NOT EXISTS jeweler_translations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    jeweler_id UUID NOT NULL, -- References jewelers.id
+    language_id VARCHAR(5) NOT NULL REFERENCES languages(id),
+    name VARCHAR(200) NOT NULL,
+    bio TEXT,
+    specialties TEXT[],
+    location_description TEXT,
+    tagline VARCHAR(200),
+    seo_title VARCHAR(100),
+    seo_description VARCHAR(300),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(jeweler_id, language_id)
+);
+
+-- Indexes for content translations
+CREATE INDEX IF NOT EXISTS idx_story_translations_story ON story_translations(story_id);
+CREATE INDEX IF NOT EXISTS idx_story_translations_language ON story_translations(language_id);
+CREATE INDEX IF NOT EXISTS idx_product_translations_product ON product_translations(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_translations_language ON product_translations(language_id);
+CREATE INDEX IF NOT EXISTS idx_jeweler_translations_jeweler ON jeweler_translations(jeweler_id);
+CREATE INDEX IF NOT EXISTS idx_jeweler_translations_language ON jeweler_translations(language_id);
+
+-- Full-text search indexes for translations
+CREATE INDEX IF NOT EXISTS idx_story_translations_content_search 
+ON story_translations USING GIN (to_tsvector('hebrew', content));
+CREATE INDEX IF NOT EXISTS idx_story_translations_title_search 
+ON story_translations USING GIN (to_tsvector('hebrew', title));
+CREATE INDEX IF NOT EXISTS idx_product_translations_search 
+ON product_translations USING GIN (to_tsvector('hebrew', name || ' ' || COALESCE(description, '')));
+
+-- ============================================================================
+-- SYSTEM TRANSLATIONS
+-- ============================================================================
+
+-- System translations for UI elements
+CREATE TABLE IF NOT EXISTS system_translations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    translation_key VARCHAR(200) NOT NULL UNIQUE,
+    translations JSONB NOT NULL, -- {"he": "Hebrew text", "en": "English text"}
+    context VARCHAR(500), -- Description of where this is used
+    description TEXT, -- Developer notes
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index for system translations
+CREATE INDEX IF NOT EXISTS idx_system_translations_key ON system_translations(translation_key);
+CREATE INDEX IF NOT EXISTS idx_system_translations_active ON system_translations(is_active);
+
+-- Enum value translations
+CREATE TABLE IF NOT EXISTS enum_translations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    enum_type VARCHAR(100) NOT NULL, -- 'order_status', 'user_role', etc.
+    enum_value VARCHAR(100) NOT NULL,
+    translations JSONB NOT NULL, -- {"he": "Hebrew text", "en": "English text"}
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(enum_type, enum_value)
+);
+
+-- Index for enum translations
+CREATE INDEX IF NOT EXISTS idx_enum_translations_type ON enum_translations(enum_type);
+CREATE INDEX IF NOT EXISTS idx_enum_translations_active ON enum_translations(is_active);
+
+-- ============================================================================
+-- HELPER FUNCTIONS
+-- ============================================================================
+
+-- Function to get system translation with fallback
+CREATE OR REPLACE FUNCTION get_system_translation(
+    translation_key TEXT,
+    language_id TEXT DEFAULT 'he'
+)
+RETURNS TEXT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    result TEXT;
+BEGIN
+    SELECT 
+        COALESCE(
+            translations->>language_id,
+            translations->>'he',
+            translation_key
+        )
+    INTO result
+    FROM system_translations
+    WHERE system_translations.translation_key = get_system_translation.translation_key
+    AND is_active = TRUE;
+    
+    RETURN COALESCE(result, translation_key);
+END;
+$$;
+
+-- Function to get enum translation with fallback
+CREATE OR REPLACE FUNCTION get_enum_translation(
+    enum_type TEXT,
+    enum_value TEXT,
+    language_id TEXT DEFAULT 'he'
+)
+RETURNS TEXT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    result TEXT;
+BEGIN
+    SELECT 
+        COALESCE(
+            translations->>language_id,
+            translations->>'he',
+            enum_value
+        )
+    INTO result
+    FROM enum_translations
+    WHERE enum_translations.enum_type = get_enum_translation.enum_type
+    AND enum_translations.enum_value = get_enum_translation.enum_value
+    AND is_active = TRUE;
+    
+    RETURN COALESCE(result, enum_value);
+END;
+$$;
+
+-- Function to check translation completeness
+CREATE OR REPLACE FUNCTION get_translation_completeness(
+    entity_type TEXT,
+    entity_id UUID
+)
+RETURNS TABLE(
+    language_id TEXT,
+    language_name TEXT,
+    is_complete BOOLEAN,
+    missing_fields TEXT[]
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        l.id as language_id,
+        l.name->>'he' as language_name,
+        CASE 
+            WHEN entity_type = 'story' THEN
+                EXISTS(SELECT 1 FROM story_translations st WHERE st.story_id = entity_id AND st.language_id = l.id)
+            WHEN entity_type = 'product' THEN
+                EXISTS(SELECT 1 FROM product_translations pt WHERE pt.product_id = entity_id AND pt.language_id = l.id)
+            WHEN entity_type = 'jeweler' THEN
+                EXISTS(SELECT 1 FROM jeweler_translations jt WHERE jt.jeweler_id = entity_id AND jt.language_id = l.id)
+            ELSE FALSE
+        END as is_complete,
+        CASE 
+            WHEN entity_type = 'story' AND NOT EXISTS(SELECT 1 FROM story_translations st WHERE st.story_id = entity_id AND st.language_id = l.id)
+                THEN ARRAY['title', 'content']
+            WHEN entity_type = 'product' AND NOT EXISTS(SELECT 1 FROM product_translations pt WHERE pt.product_id = entity_id AND pt.language_id = l.id)
+                THEN ARRAY['name', 'description']
+            WHEN entity_type = 'jeweler' AND NOT EXISTS(SELECT 1 FROM jeweler_translations jt WHERE jt.jeweler_id = entity_id AND jt.language_id = l.id)
+                THEN ARRAY['name', 'bio']
+            ELSE ARRAY[]::TEXT[]
+        END as missing_fields
+    FROM languages l
+    WHERE l.is_active = TRUE
+    ORDER BY l.sort_order;
+END;
+$$;
+
+-- ============================================================================
+-- MULTILINGUAL VIEWS
+-- ============================================================================
+
+-- Stories multilingual view
+CREATE OR REPLACE VIEW stories_multilingual AS
+SELECT 
+    s.id,
+    s.user_id,
+    COALESCE(st.title, st_fallback.title) as title,
+    COALESCE(st.content, st_fallback.content) as content,
+    COALESCE(st.summary, st_fallback.summary) as summary,
+    COALESCE(st.emotion_tags, st_fallback.emotion_tags) as emotion_tags,
+    COALESCE(st.seo_title, st_fallback.seo_title) as seo_title,
+    COALESCE(st.seo_description, st_fallback.seo_description) as seo_description,
+    COALESCE(st.language_id, st_fallback.language_id, 'he') as language_id,
+    current_setting('app.current_language', true) as requested_language,
+    'he' as fallback_language,
+    (st.language_id = current_setting('app.current_language', true)) as has_requested_translation,
+    s.created_at,
+    s.updated_at
+FROM stories s
+LEFT JOIN story_translations st ON s.id = st.story_id 
+    AND st.language_id = current_setting('app.current_language', true)
+LEFT JOIN story_translations st_fallback ON s.id = st_fallback.story_id 
+    AND st_fallback.language_id = 'he';
+
+-- Products multilingual view  
+CREATE OR REPLACE VIEW products_multilingual AS
+SELECT 
+    p.id,
+    p.jeweler_id,
+    p.price,
+    p.images,
+    COALESCE(pt.name, pt_fallback.name) as name,
+    COALESCE(pt.description, pt_fallback.description) as description,
+    COALESCE(pt.short_description, pt_fallback.short_description) as short_description,
+    COALESCE(pt.materials_description, pt_fallback.materials_description) as materials_description,
+    COALESCE(pt.care_instructions, pt_fallback.care_instructions) as care_instructions,
+    COALESCE(pt.style_tags, pt_fallback.style_tags) as style_tags,
+    COALESCE(pt.seo_title, pt_fallback.seo_title) as seo_title,
+    COALESCE(pt.seo_description, pt_fallback.seo_description) as seo_description,
+    COALESCE(pt.language_id, pt_fallback.language_id, 'he') as language_id,
+    current_setting('app.current_language', true) as requested_language,
+    'he' as fallback_language,
+    (pt.language_id = current_setting('app.current_language', true)) as has_requested_translation,
+    p.created_at,
+    p.updated_at
+FROM products p
+LEFT JOIN product_translations pt ON p.id = pt.product_id 
+    AND pt.language_id = current_setting('app.current_language', true)
+LEFT JOIN product_translations pt_fallback ON p.id = pt_fallback.product_id 
+    AND pt_fallback.language_id = 'he';
+
+-- Jewelers multilingual view
+CREATE OR REPLACE VIEW jewelers_multilingual AS
+SELECT 
+    j.id,
+    j.user_id,
+    j.portfolio_url,
+    COALESCE(jt.name, jt_fallback.name) as name,
+    COALESCE(jt.bio, jt_fallback.bio) as bio,
+    COALESCE(jt.specialties, jt_fallback.specialties) as specialties,
+    COALESCE(jt.location_description, jt_fallback.location_description) as location_description,
+    COALESCE(jt.tagline, jt_fallback.tagline) as tagline,
+    COALESCE(jt.seo_title, jt_fallback.seo_title) as seo_title,
+    COALESCE(jt.seo_description, jt_fallback.seo_description) as seo_description,
+    COALESCE(jt.language_id, jt_fallback.language_id, 'he') as language_id,
+    current_setting('app.current_language', true) as requested_language,
+    'he' as fallback_language,
+    (jt.language_id = current_setting('app.current_language', true)) as has_requested_translation,
+    j.created_at,
+    j.updated_at
+FROM jewelers j
+LEFT JOIN jeweler_translations jt ON j.id = jt.jeweler_id 
+    AND jt.language_id = current_setting('app.current_language', true)
+LEFT JOIN jeweler_translations jt_fallback ON j.id = jt_fallback.jeweler_id 
+    AND jt_fallback.language_id = 'he';
+
+-- ============================================================================
+-- TRIGGERS FOR AUTOMATIC UPDATES
+-- ============================================================================
+
+-- Function to update timestamps
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language plpgsql;
+
+-- Add triggers for timestamp updates
+CREATE TRIGGER update_languages_updated_at 
+    BEFORE UPDATE ON languages 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_translation_metadata_updated_at 
+    BEFORE UPDATE ON translation_metadata 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_story_translations_updated_at 
+    BEFORE UPDATE ON story_translations 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_product_translations_updated_at 
+    BEFORE UPDATE ON product_translations 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_jeweler_translations_updated_at 
+    BEFORE UPDATE ON jeweler_translations 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_system_translations_updated_at 
+    BEFORE UPDATE ON system_translations 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_enum_translations_updated_at 
+    BEFORE UPDATE ON enum_translations 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- SAMPLE DATA INSERTION
+-- ============================================================================
+
+-- Insert sample system translations
+INSERT INTO system_translations (translation_key, translations, context, description) VALUES
+('navigation.home', '{"he": "בית", "en": "Home"}', 'Main navigation', 'Homepage link'),
+('navigation.stories', '{"he": "סיפורים", "en": "Stories"}', 'Main navigation', 'Stories section link'),
+('navigation.products', '{"he": "מוצרים", "en": "Products"}', 'Main navigation', 'Products section link'),
+('navigation.jewelers', '{"he": "צורפים", "en": "Jewelers"}', 'Main navigation', 'Jewelers section link'),
+('buttons.save', '{"he": "שמור", "en": "Save"}', 'Form buttons', 'Save action button'),
+('buttons.cancel', '{"he": "בטל", "en": "Cancel"}', 'Form buttons', 'Cancel action button'),
+('buttons.edit', '{"he": "ערוך", "en": "Edit"}', 'Form buttons', 'Edit action button'),
+('buttons.search', '{"he": "חפש", "en": "Search"}', 'Form buttons', 'Search action button'),
+('messages.loading', '{"he": "טוען...", "en": "Loading..."}', 'Status messages', 'Loading state indicator'),
+('messages.success', '{"he": "פעולה בוצעה בהצלחה", "en": "Operation completed successfully"}', 'Status messages', 'Success notification'),
+('messages.no_results', '{"he": "לא נמצאו תוצאות", "en": "No results found"}', 'Status messages', 'Empty state message')
+ON CONFLICT (translation_key) DO NOTHING;
+
+-- Insert sample enum translations
+INSERT INTO enum_translations (enum_type, enum_value, translations, sort_order) VALUES
+('order_status', 'pending', '{"he": "ממתין", "en": "Pending"}', 1),
+('order_status', 'confirmed', '{"he": "אושר", "en": "Confirmed"}', 2),
+('order_status', 'in_progress', '{"he": "בתהליך", "en": "In Progress"}', 3),
+('order_status', 'completed', '{"he": "הושלם", "en": "Completed"}', 4),
+('order_status', 'shipped', '{"he": "נשלח", "en": "Shipped"}', 5),
+('product_category', 'rings', '{"he": "טבעות", "en": "Rings"}', 1),
+('product_category', 'necklaces', '{"he": "שרשראות", "en": "Necklaces"}', 2),
+('product_category', 'earrings', '{"he": "עגילים", "en": "Earrings"}', 3),
+('product_category', 'bracelets', '{"he": "צמידים", "en": "Bracelets"}', 4),
+('material', 'gold', '{"he": "זהב", "en": "Gold"}', 1),
+('material', 'silver', '{"he": "כסף", "en": "Silver"}', 2),
+('material', 'diamond', '{"he": "יהלום", "en": "Diamond"}', 3),
+('material', 'pearl', '{"he": "פנינה", "en": "Pearl"}', 4)
+ON CONFLICT (enum_type, enum_value) DO NOTHING;
+
+-- ============================================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- ============================================================================
+
+-- Enable RLS on all tables
+ALTER TABLE languages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE translation_metadata ENABLE ROW LEVEL SECURITY;
+ALTER TABLE story_translations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_translations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE jeweler_translations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_translations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE enum_translations ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for read access (all authenticated users can read)
+CREATE POLICY "Allow read access to languages" ON languages FOR SELECT USING (TRUE);
+CREATE POLICY "Allow read access to system translations" ON system_translations FOR SELECT USING (TRUE);
+CREATE POLICY "Allow read access to enum translations" ON enum_translations FOR SELECT USING (TRUE);
+
+-- More restrictive policies can be added based on your authentication system
+
+-- ============================================================================
+-- PERFORMANCE OPTIMIZATIONS
+-- ============================================================================
+
+-- Analyze tables for query optimization
+ANALYZE languages;
+ANALYZE translation_metadata;
+ANALYZE story_translations;
+ANALYZE product_translations;
+ANALYZE jeweler_translations;
+ANALYZE system_translations;
+ANALYZE enum_translations;
+
+-- Create additional indexes for common query patterns
+CREATE INDEX IF NOT EXISTS idx_system_translations_jsonb_he ON system_translations USING GIN ((translations->>'he'));
+CREATE INDEX IF NOT EXISTS idx_system_translations_jsonb_en ON system_translations USING GIN ((translations->>'en'));
+CREATE INDEX IF NOT EXISTS idx_enum_translations_jsonb_he ON enum_translations USING GIN ((translations->>'he'));
+CREATE INDEX IF NOT EXISTS idx_enum_translations_jsonb_en ON enum_translations USING GIN ((translations->>'en'));
+
+-- ============================================================================
+-- COMMENTS FOR DOCUMENTATION
+-- ============================================================================
+
+COMMENT ON TABLE languages IS 'Supported languages with metadata including direction and default status';
+COMMENT ON TABLE translation_metadata IS 'Tracks translation status and metadata for multilingual entities';
+COMMENT ON TABLE story_translations IS 'Story content translations for all supported languages';
+COMMENT ON TABLE product_translations IS 'Product information translations for all supported languages';
+COMMENT ON TABLE jeweler_translations IS 'Jeweler profile translations for all supported languages';
+COMMENT ON TABLE system_translations IS 'UI element translations stored as JSON for efficient access';
+COMMENT ON TABLE enum_translations IS 'Enum value translations for dropdown lists and status indicators';
+COMMENT ON VIEW stories_multilingual IS 'Automatic language fallback view for story content';
+COMMENT ON VIEW products_multilingual IS 'Automatic language fallback view for product content';
+COMMENT ON VIEW jewelers_multilingual IS 'Automatic language fallback view for jeweler content';
+COMMENT ON FUNCTION get_system_translation(TEXT, TEXT) IS 'Retrieves system translation with Hebrew fallback';
+COMMENT ON FUNCTION get_enum_translation(TEXT, TEXT, TEXT) IS 'Retrieves enum translation with Hebrew fallback';
+COMMENT ON FUNCTION get_translation_completeness(TEXT, UUID) IS 'Analyzes translation completeness for entities'; 
+
+================================================================================
+
+STEP 2: Core Business Tables
+
+-- GemsAI Core Business Tables Migration
+-- Creates the main business entities for the GemsAI platform
+
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================================================
+-- ENUMS
+-- ============================================================================
+
+-- User roles
+CREATE TYPE user_role AS ENUM ('user', 'jeweler', 'admin');
+
+-- Story statuses
+CREATE TYPE story_status AS ENUM ('draft', 'submitted', 'processing', 'completed');
+
+-- Sketch statuses
+CREATE TYPE sketch_status AS ENUM ('generating', 'completed', 'failed', 'archived');
+
+-- Verification statuses
+CREATE TYPE verification_status AS ENUM ('pending', 'verified', 'rejected', 'suspended');
+
+-- Order statuses
+CREATE TYPE order_status AS ENUM ('pending', 'confirmed', 'in_progress', 'completed', 'shipped', 'delivered', 'cancelled');
+
+-- Payment statuses
+CREATE TYPE payment_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'refunded');
+
+-- Gift statuses
+CREATE TYPE gift_status AS ENUM ('created', 'sent', 'viewed', 'expired');
+
+-- ============================================================================
+-- CORE BUSINESS TABLES
+-- ============================================================================
+
+-- Users table - Central user management
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255),
+    avatar_url TEXT,
+    role user_role NOT NULL DEFAULT 'user',
+    phone VARCHAR(20),
+    date_of_birth DATE,
+    preferred_language VARCHAR(10) DEFAULT 'he' REFERENCES languages(id),
+    email_verified BOOLEAN DEFAULT FALSE,
+    phone_verified BOOLEAN DEFAULT FALSE,
+    marketing_consent BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Stories table - User emotional stories
+CREATE TABLE IF NOT EXISTS stories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    emotion VARCHAR(100),
+    jewelry_style VARCHAR(100),
+    material_preference VARCHAR(100),
+    budget_range VARCHAR(50),
+    timeline VARCHAR(50),
+    special_requests TEXT,
+    image_urls TEXT[],
+    status story_status DEFAULT 'draft',
+    ai_analysis JSONB, -- Store AI emotion analysis results
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Sketches table - AI-generated sketches
+CREATE TABLE IF NOT EXISTS sketches (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    story_id UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    prompt TEXT NOT NULL, -- The AI prompt used for generation
+    ai_model VARCHAR(50), -- 'dall-e-3', 'sdxl', etc.
+    generation_params JSONB, -- Store generation parameters
+    variants TEXT[], -- URLs of style variants
+    status sketch_status DEFAULT 'generating',
+    generation_cost DECIMAL(10,4), -- Track AI generation costs
+    user_rating INTEGER CHECK (user_rating BETWEEN 1 AND 5),
+    user_feedback TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Jewelers table - Jeweler profiles and verification
+CREATE TABLE IF NOT EXISTS jewelers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    business_name VARCHAR(255),
+    business_license VARCHAR(100),
+    portfolio_url TEXT,
+    verification_status verification_status DEFAULT 'pending',
+    verification_documents TEXT[], -- URLs to verification docs
+    rating DECIMAL(3,2) DEFAULT 0.00,
+    total_orders INTEGER DEFAULT 0,
+    response_time_hours INTEGER DEFAULT 24,
+    location_city VARCHAR(100),
+    location_country VARCHAR(100),
+    specialties TEXT[], -- Array of specialization tags
+    years_experience INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Products table - Jeweler product catalog
+CREATE TABLE IF NOT EXISTS products (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    jeweler_id UUID NOT NULL REFERENCES jewelers(id) ON DELETE CASCADE,
+    sku VARCHAR(100),
+    price DECIMAL(10,2),
+    currency VARCHAR(3) DEFAULT 'ILS',
+    images TEXT[] NOT NULL,
+    category VARCHAR(100),
+    materials TEXT[],
+    dimensions JSONB, -- Store width, height, depth, weight
+    customizable BOOLEAN DEFAULT FALSE,
+    lead_time_days INTEGER DEFAULT 7,
+    is_available BOOLEAN DEFAULT TRUE,
+    inventory_count INTEGER,
+    emotion_tags TEXT[], -- Tags for emotion-based matching
+    style_tags TEXT[], -- Style-based tags
+    featured BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Orders table - Order management and tracking
+CREATE TABLE IF NOT EXISTS orders (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    order_number VARCHAR(50) UNIQUE NOT NULL, -- Human-readable order number
+    user_id UUID NOT NULL REFERENCES users(id),
+    jeweler_id UUID NOT NULL REFERENCES jewelers(id),
+    story_id UUID REFERENCES stories(id),
+    product_id UUID REFERENCES products(id),
+    status order_status DEFAULT 'pending',
+    total_amount DECIMAL(10,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'ILS',
+    payment_id VARCHAR(255), -- External payment provider ID
+    payment_status payment_status DEFAULT 'pending',
+    shipping_address JSONB,
+    billing_address JSONB,
+    tracking_number VARCHAR(100),
+    estimated_delivery DATE,
+    actual_delivery DATE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Gifts table - Gift sharing and management
+CREATE TABLE IF NOT EXISTS gifts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    sender_id UUID NOT NULL REFERENCES users(id),
+    recipient_email VARCHAR(255) NOT NULL,
+    recipient_name VARCHAR(255),
+    story_id UUID REFERENCES stories(id),
+    sketch_id UUID REFERENCES sketches(id),
+    product_id UUID REFERENCES products(id),
+    message TEXT,
+    share_token VARCHAR(100) UNIQUE NOT NULL, -- For secure sharing
+    animation_type VARCHAR(50), -- Gift wrap animation
+    voice_message_url TEXT, -- ElevenLabs TTS URL
+    status gift_status DEFAULT 'created',
+    viewed_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================================================
+-- SUPPORTING TABLES
+-- ============================================================================
+
+-- Sketch-Product matches table - AI-generated matches
+CREATE TABLE IF NOT EXISTS sketch_product_matches (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    sketch_id UUID NOT NULL REFERENCES sketches(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    match_score DECIMAL(5,4), -- 0.0000 to 1.0000
+    match_reasoning TEXT,
+    ai_model VARCHAR(50),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(sketch_id, product_id)
+);
+
+-- User preferences table - User preferences and personalization
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    preferred_styles TEXT[],
+    preferred_materials TEXT[],
+    budget_range VARCHAR(50),
+    notification_settings JSONB,
+    privacy_settings JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Reviews table - Product and jeweler reviews
+CREATE TABLE IF NOT EXISTS reviews (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    order_id UUID NOT NULL REFERENCES orders(id),
+    jeweler_id UUID NOT NULL REFERENCES jewelers(id),
+    product_id UUID REFERENCES products(id),
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    title VARCHAR(255),
+    content TEXT,
+    images TEXT[],
+    helpful_votes INTEGER DEFAULT 0,
+    verified_purchase BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================================================
+-- BASIC INDEXES
+-- ============================================================================
+
+-- User indexes
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_preferred_language ON users(preferred_language);
+
+-- Story indexes
+CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id);
+CREATE INDEX IF NOT EXISTS idx_stories_status ON stories(status);
+CREATE INDEX IF NOT EXISTS idx_stories_created_at ON stories(created_at DESC);
+
+-- Sketch indexes
+CREATE INDEX IF NOT EXISTS idx_sketches_story_id ON sketches(story_id);
+CREATE INDEX IF NOT EXISTS idx_sketches_status ON sketches(status);
+CREATE INDEX IF NOT EXISTS idx_sketches_ai_model ON sketches(ai_model);
+
+-- Jeweler indexes
+CREATE INDEX IF NOT EXISTS idx_jewelers_user_id ON jewelers(user_id);
+CREATE INDEX IF NOT EXISTS idx_jewelers_verification_status ON jewelers(verification_status);
+CREATE INDEX IF NOT EXISTS idx_jewelers_location ON jewelers(location_city, location_country);
+
+-- Product indexes
+CREATE INDEX IF NOT EXISTS idx_products_jeweler_id ON products(jeweler_id);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+CREATE INDEX IF NOT EXISTS idx_products_available ON products(is_available) WHERE is_available = TRUE;
+CREATE INDEX IF NOT EXISTS idx_products_featured ON products(featured) WHERE featured = TRUE;
+CREATE INDEX IF NOT EXISTS idx_products_emotion_tags ON products USING GIN(emotion_tags);
+CREATE INDEX IF NOT EXISTS idx_products_style_tags ON products USING GIN(style_tags);
+
+-- Order indexes
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_jeweler_id ON orders(jeweler_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
+
+-- Gift indexes
+CREATE INDEX IF NOT EXISTS idx_gifts_sender_id ON gifts(sender_id);
+CREATE INDEX IF NOT EXISTS idx_gifts_share_token ON gifts(share_token);
+CREATE INDEX IF NOT EXISTS idx_gifts_recipient_email ON gifts(recipient_email);
+CREATE INDEX IF NOT EXISTS idx_gifts_status ON gifts(status);
+
+-- Supporting table indexes
+CREATE INDEX IF NOT EXISTS idx_sketch_product_matches_sketch ON sketch_product_matches(sketch_id);
+CREATE INDEX IF NOT EXISTS idx_sketch_product_matches_product ON sketch_product_matches(product_id);
+CREATE INDEX IF NOT EXISTS idx_sketch_product_matches_score ON sketch_product_matches(match_score DESC);
+
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_order_id ON reviews(order_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_jeweler_id ON reviews(jeweler_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(rating);
+
+-- ============================================================================
+-- TRIGGERS FOR UPDATED_AT
+-- ============================================================================
+
+-- Add updated_at triggers to all tables
+CREATE TRIGGER set_updated_at_users
+    BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_stories
+    BEFORE UPDATE ON stories
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_sketches
+    BEFORE UPDATE ON sketches
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_jewelers
+    BEFORE UPDATE ON jewelers
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_products
+    BEFORE UPDATE ON products
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_orders
+    BEFORE UPDATE ON orders
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_gifts
+    BEFORE UPDATE ON gifts
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_sketch_product_matches
+    BEFORE UPDATE ON sketch_product_matches
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_user_preferences
+    BEFORE UPDATE ON user_preferences
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_reviews
+    BEFORE UPDATE ON reviews
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+-- ============================================================================
+-- HELPER FUNCTIONS
+-- ============================================================================
+
+-- Function to generate unique order numbers
+CREATE OR REPLACE FUNCTION generate_order_number()
+RETURNS TEXT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    new_number TEXT;
+    counter INTEGER := 0;
+BEGIN
+    LOOP
+        -- Generate order number: GEM-YYYYMMDD-XXXX
+        new_number := 'GEM-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || 
+                     LPAD((EXTRACT(EPOCH FROM NOW())::INTEGER % 10000)::TEXT, 4, '0');
+        
+        -- Check if this number already exists
+        IF NOT EXISTS (SELECT 1 FROM orders WHERE order_number = new_number) THEN
+            RETURN new_number;
+        END IF;
+        
+        -- Safety counter to prevent infinite loops
+        counter := counter + 1;
+        IF counter > 100 THEN
+            -- Fallback to UUID-based number
+            new_number := 'GEM-' || REPLACE(uuid_generate_v4()::TEXT, '-', '')::TEXT;
+            EXIT;
+        END IF;
+    END LOOP;
+    
+    RETURN new_number;
+END;
+$$;
+
+-- Function to generate secure share tokens for gifts
+CREATE OR REPLACE FUNCTION generate_share_token()
+RETURNS TEXT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    new_token TEXT;
+    counter INTEGER := 0;
+BEGIN
+    LOOP
+        -- Generate a secure random token
+        new_token := encode(gen_random_bytes(32), 'base64');
+        -- Remove URL-unsafe characters
+        new_token := REPLACE(REPLACE(REPLACE(new_token, '+', ''), '/', ''), '=', '');
+        -- Take first 32 characters
+        new_token := SUBSTRING(new_token, 1, 32);
+        
+        -- Check if this token already exists
+        IF NOT EXISTS (SELECT 1 FROM gifts WHERE share_token = new_token) THEN
+            RETURN new_token;
+        END IF;
+        
+        -- Safety counter
+        counter := counter + 1;
+        IF counter > 100 THEN
+            -- Fallback to UUID
+            new_token := REPLACE(uuid_generate_v4()::TEXT, '-', '');
+            EXIT;
+        END IF;
+    END LOOP;
+    
+    RETURN new_token;
+END;
+$$;
+
+-- ============================================================================
+-- COMMENTS FOR DOCUMENTATION
+-- ============================================================================
+
+COMMENT ON TABLE users IS 'Central user management with role-based access control';
+COMMENT ON TABLE stories IS 'User emotional stories that drive AI sketch generation';
+COMMENT ON TABLE sketches IS 'AI-generated sketches based on user stories';
+COMMENT ON TABLE jewelers IS 'Jeweler profiles with verification and business information';
+COMMENT ON TABLE products IS 'Jeweler product catalog with emotion and style tagging';
+COMMENT ON TABLE orders IS 'Order management and tracking with payment integration';
+COMMENT ON TABLE gifts IS 'Gift sharing system with secure tokens and animations';
+COMMENT ON TABLE sketch_product_matches IS 'AI-generated matches between sketches and products';
+COMMENT ON TABLE user_preferences IS 'User preferences for personalization';
+COMMENT ON TABLE reviews IS 'Product and jeweler reviews with verification';
+
+-- Column comments for key fields
+COMMENT ON COLUMN users.preferred_language IS 'References languages.id for i18n support';
+COMMENT ON COLUMN stories.ai_analysis IS 'JSON storage for AI emotion analysis results';
+COMMENT ON COLUMN sketches.generation_params IS 'JSON storage for AI generation parameters';
+COMMENT ON COLUMN products.emotion_tags IS 'Array of emotion tags for AI matching';
+COMMENT ON COLUMN orders.order_number IS 'Human-readable order identifier';
+COMMENT ON COLUMN gifts.share_token IS 'Secure token for gift sharing URLs'; 
+
+================================================================================
+
+STEP 3: Relationships & Constraints
+
+-- GemsAI Relationships and Constraints Migration
+-- Establishes foreign key relationships, constraints, and junction tables
+
+-- ============================================================================
+-- FOREIGN KEY CONSTRAINTS
+-- ============================================================================
+
+-- Users table constraints
+ALTER TABLE users 
+ADD CONSTRAINT users_preferred_language_fkey 
+FOREIGN KEY (preferred_language) REFERENCES languages(id);
+
+-- Stories table constraints
+ALTER TABLE stories 
+ADD CONSTRAINT stories_user_id_fkey 
+FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+
+-- Sketches table constraints
+ALTER TABLE sketches 
+ADD CONSTRAINT sketches_story_id_fkey 
+FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
+
+-- Jewelers table constraints
+ALTER TABLE jewelers 
+ADD CONSTRAINT jewelers_user_id_fkey 
+FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+
+-- Products table constraints
+ALTER TABLE products 
+ADD CONSTRAINT products_jeweler_id_fkey 
+FOREIGN KEY (jeweler_id) REFERENCES jewelers(id) ON DELETE CASCADE;
+
+-- Orders table constraints
+ALTER TABLE orders 
+ADD CONSTRAINT orders_user_id_fkey 
+FOREIGN KEY (user_id) REFERENCES users(id),
+ADD CONSTRAINT orders_jeweler_id_fkey 
+FOREIGN KEY (jeweler_id) REFERENCES jewelers(id),
+ADD CONSTRAINT orders_story_id_fkey 
+FOREIGN KEY (story_id) REFERENCES stories(id),
+ADD CONSTRAINT orders_product_id_fkey 
+FOREIGN KEY (product_id) REFERENCES products(id);
+
+-- Gifts table constraints
+ALTER TABLE gifts 
+ADD CONSTRAINT gifts_sender_id_fkey 
+FOREIGN KEY (sender_id) REFERENCES users(id),
+ADD CONSTRAINT gifts_story_id_fkey 
+FOREIGN KEY (story_id) REFERENCES stories(id),
+ADD CONSTRAINT gifts_sketch_id_fkey 
+FOREIGN KEY (sketch_id) REFERENCES sketches(id),
+ADD CONSTRAINT gifts_product_id_fkey 
+FOREIGN KEY (product_id) REFERENCES products(id);
+
+-- Supporting tables constraints
+ALTER TABLE sketch_product_matches 
+ADD CONSTRAINT sketch_product_matches_sketch_id_fkey 
+FOREIGN KEY (sketch_id) REFERENCES sketches(id) ON DELETE CASCADE,
+ADD CONSTRAINT sketch_product_matches_product_id_fkey 
+FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
+
+ALTER TABLE user_preferences 
+ADD CONSTRAINT user_preferences_user_id_fkey 
+FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+
+ALTER TABLE reviews 
+ADD CONSTRAINT reviews_user_id_fkey 
+FOREIGN KEY (user_id) REFERENCES users(id),
+ADD CONSTRAINT reviews_order_id_fkey 
+FOREIGN KEY (order_id) REFERENCES orders(id),
+ADD CONSTRAINT reviews_jeweler_id_fkey 
+FOREIGN KEY (jeweler_id) REFERENCES jewelers(id),
+ADD CONSTRAINT reviews_product_id_fkey 
+FOREIGN KEY (product_id) REFERENCES products(id);
+
+-- ============================================================================
+-- CHECK CONSTRAINTS
+-- ============================================================================
+
+-- User constraints
+ALTER TABLE users 
+ADD CONSTRAINT users_email_format_check 
+CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
+ADD CONSTRAINT users_phone_format_check 
+CHECK (phone IS NULL OR phone ~* '^\+?[1-9]\d{1,14}$');
+
+-- Story constraints
+ALTER TABLE stories 
+ADD CONSTRAINT stories_budget_range_check 
+CHECK (budget_range IS NULL OR budget_range IN ('under_500', '500_1000', '1000_2500', '2500_5000', '5000_10000', 'over_10000')),
+ADD CONSTRAINT stories_timeline_check 
+CHECK (timeline IS NULL OR timeline IN ('urgent', '1_week', '2_weeks', '1_month', '2_months', 'flexible'));
+
+-- Sketch constraints
+ALTER TABLE sketches 
+ADD CONSTRAINT sketches_user_rating_check 
+CHECK (user_rating IS NULL OR (user_rating >= 1 AND user_rating <= 5)),
+ADD CONSTRAINT sketches_generation_cost_check 
+CHECK (generation_cost IS NULL OR generation_cost >= 0);
+
+-- Jeweler constraints
+ALTER TABLE jewelers 
+ADD CONSTRAINT jewelers_rating_check 
+CHECK (rating >= 0 AND rating <= 5),
+ADD CONSTRAINT jewelers_total_orders_check 
+CHECK (total_orders >= 0),
+ADD CONSTRAINT jewelers_response_time_check 
+CHECK (response_time_hours > 0),
+ADD CONSTRAINT jewelers_years_experience_check 
+CHECK (years_experience IS NULL OR years_experience >= 0);
+
+-- Product constraints
+ALTER TABLE products 
+ADD CONSTRAINT products_price_check 
+CHECK (price IS NULL OR price >= 0),
+ADD CONSTRAINT products_currency_check 
+CHECK (currency IN ('ILS', 'USD', 'EUR', 'GBP')),
+ADD CONSTRAINT products_lead_time_check 
+CHECK (lead_time_days >= 0),
+ADD CONSTRAINT products_inventory_check 
+CHECK (inventory_count IS NULL OR inventory_count >= 0);
+
+-- Order constraints
+ALTER TABLE orders 
+ADD CONSTRAINT orders_total_amount_check 
+CHECK (total_amount >= 0),
+ADD CONSTRAINT orders_currency_check 
+CHECK (currency IN ('ILS', 'USD', 'EUR', 'GBP')),
+ADD CONSTRAINT orders_delivery_dates_check 
+CHECK (estimated_delivery IS NULL OR actual_delivery IS NULL OR actual_delivery >= estimated_delivery);
+
+-- Gift constraints
+ALTER TABLE gifts 
+ADD CONSTRAINT gifts_expires_after_created_check 
+CHECK (expires_at IS NULL OR expires_at > created_at),
+ADD CONSTRAINT gifts_viewed_after_created_check 
+CHECK (viewed_at IS NULL OR viewed_at >= created_at);
+
+-- Review constraints
+ALTER TABLE reviews 
+ADD CONSTRAINT reviews_rating_check 
+CHECK (rating >= 1 AND rating <= 5),
+ADD CONSTRAINT reviews_helpful_votes_check 
+CHECK (helpful_votes >= 0);
+
+-- Sketch-Product match constraints
+ALTER TABLE sketch_product_matches 
+ADD CONSTRAINT sketch_product_matches_score_check 
+CHECK (match_score IS NULL OR (match_score >= 0 AND match_score <= 1));
+
+-- ============================================================================
+-- UNIQUE CONSTRAINTS
+-- ============================================================================
+
+-- Ensure unique business constraints
+ALTER TABLE users 
+ADD CONSTRAINT users_email_unique UNIQUE (email);
+
+ALTER TABLE jewelers 
+ADD CONSTRAINT jewelers_user_id_unique UNIQUE (user_id),
+ADD CONSTRAINT jewelers_business_license_unique UNIQUE (business_license) 
+WHERE business_license IS NOT NULL;
+
+ALTER TABLE products 
+ADD CONSTRAINT products_jeweler_sku_unique UNIQUE (jeweler_id, sku) 
+WHERE sku IS NOT NULL;
+
+ALTER TABLE orders 
+ADD CONSTRAINT orders_order_number_unique UNIQUE (order_number);
+
+ALTER TABLE gifts 
+ADD CONSTRAINT gifts_share_token_unique UNIQUE (share_token);
+
+ALTER TABLE user_preferences 
+ADD CONSTRAINT user_preferences_user_id_unique UNIQUE (user_id);
+
+ALTER TABLE sketch_product_matches 
+ADD CONSTRAINT sketch_product_matches_unique UNIQUE (sketch_id, product_id);
+
+-- ============================================================================
+-- JUNCTION TABLES FOR MANY-TO-MANY RELATIONSHIPS
+-- ============================================================================
+
+-- User favorite products (many-to-many)
+CREATE TABLE IF NOT EXISTS user_favorite_products (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, product_id)
+);
+
+-- User favorite jewelers (many-to-many)
+CREATE TABLE IF NOT EXISTS user_favorite_jewelers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    jeweler_id UUID NOT NULL REFERENCES jewelers(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, jeweler_id)
+);
+
+-- Product categories (many-to-many with category management)
+CREATE TABLE IF NOT EXISTS categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    parent_id UUID REFERENCES categories(id),
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS product_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(product_id, category_id)
+);
+
+-- Product tags (many-to-many with tag management)
+CREATE TABLE IF NOT EXISTS tags (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(50) NOT NULL UNIQUE,
+    type VARCHAR(20) NOT NULL CHECK (type IN ('emotion', 'style', 'material', 'occasion')),
+    description TEXT,
+    color VARCHAR(7), -- Hex color for UI
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS product_tags (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    tag_id UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(product_id, tag_id)
+);
+
+-- Story tags (many-to-many)
+CREATE TABLE IF NOT EXISTS story_tags (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    story_id UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+    tag_id UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(story_id, tag_id)
+);
+
+-- ============================================================================
+-- INDEXES FOR JUNCTION TABLES
+-- ============================================================================
+
+-- User favorites indexes
+CREATE INDEX IF NOT EXISTS idx_user_favorite_products_user_id ON user_favorite_products(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_favorite_products_product_id ON user_favorite_products(product_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_favorite_jewelers_user_id ON user_favorite_jewelers(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_favorite_jewelers_jeweler_id ON user_favorite_jewelers(jeweler_id);
+
+-- Category indexes
+CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
+CREATE INDEX IF NOT EXISTS idx_categories_active ON categories(is_active) WHERE is_active = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_product_categories_product_id ON product_categories(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_categories_category_id ON product_categories(category_id);
+
+-- Tag indexes
+CREATE INDEX IF NOT EXISTS idx_tags_type ON tags(type);
+CREATE INDEX IF NOT EXISTS idx_tags_active ON tags(is_active) WHERE is_active = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_product_tags_product_id ON product_tags(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_tags_tag_id ON product_tags(tag_id);
+
+CREATE INDEX IF NOT EXISTS idx_story_tags_story_id ON story_tags(story_id);
+CREATE INDEX IF NOT EXISTS idx_story_tags_tag_id ON story_tags(tag_id);
+
+-- ============================================================================
+-- TRIGGERS FOR JUNCTION TABLES
+-- ============================================================================
+
+-- Add updated_at triggers for new tables
+CREATE TRIGGER set_updated_at_categories
+    BEFORE UPDATE ON categories
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_tags
+    BEFORE UPDATE ON tags
+    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+-- ============================================================================
+-- BUSINESS LOGIC CONSTRAINTS
+-- ============================================================================
+
+-- Ensure jewelers can only review orders they fulfilled
+CREATE OR REPLACE FUNCTION check_jeweler_order_access()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM orders 
+        WHERE id = NEW.order_id 
+        AND jeweler_id = (
+            SELECT id FROM jewelers WHERE user_id = auth.uid()
+        )
+    ) THEN
+        RAISE EXCEPTION 'Jewelers can only access their own orders';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Ensure users can only review orders they placed
+CREATE OR REPLACE FUNCTION check_user_review_access()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM orders 
+        WHERE id = NEW.order_id 
+        AND user_id = NEW.user_id
+        AND status = 'delivered'
+    ) THEN
+        RAISE EXCEPTION 'Users can only review delivered orders they placed';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply business logic triggers
+CREATE TRIGGER check_user_review_access_trigger
+    BEFORE INSERT ON reviews
+    FOR EACH ROW EXECUTE FUNCTION check_user_review_access();
+
+-- ============================================================================
+-- MATERIALIZED VIEWS FOR PERFORMANCE
+-- ============================================================================
+
+-- Popular products view
+CREATE MATERIALIZED VIEW IF NOT EXISTS popular_products AS
+SELECT 
+    p.id,
+    p.jeweler_id,
+    COUNT(o.id) as order_count,
+    AVG(r.rating) as avg_rating,
+    COUNT(r.id) as review_count,
+    COUNT(ufp.id) as favorite_count
+FROM products p
+LEFT JOIN orders o ON p.id = o.product_id AND o.status = 'delivered'
+LEFT JOIN reviews r ON p.id = r.product_id
+LEFT JOIN user_favorite_products ufp ON p.id = ufp.product_id
+WHERE p.is_available = TRUE
+GROUP BY p.id, p.jeweler_id;
+
+-- Create index on materialized view
+CREATE UNIQUE INDEX IF NOT EXISTS idx_popular_products_id ON popular_products(id);
+CREATE INDEX IF NOT EXISTS idx_popular_products_order_count ON popular_products(order_count DESC);
+CREATE INDEX IF NOT EXISTS idx_popular_products_rating ON popular_products(avg_rating DESC);
+
+-- Jeweler performance view
+CREATE MATERIALIZED VIEW IF NOT EXISTS jeweler_performance AS
+SELECT 
+    j.id,
+    j.user_id,
+    COUNT(DISTINCT o.id) as total_orders,
+    COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'delivered') as completed_orders,
+    AVG(r.rating) as avg_rating,
+    COUNT(r.id) as review_count,
+    AVG(EXTRACT(EPOCH FROM (o.actual_delivery - o.created_at))/86400) as avg_delivery_days
+FROM jewelers j
+LEFT JOIN orders o ON j.id = o.jeweler_id
+LEFT JOIN reviews r ON j.id = r.jeweler_id
+GROUP BY j.id, j.user_id;
+
+-- Create index on jeweler performance view
+CREATE UNIQUE INDEX IF NOT EXISTS idx_jeweler_performance_id ON jeweler_performance(id);
+CREATE INDEX IF NOT EXISTS idx_jeweler_performance_rating ON jeweler_performance(avg_rating DESC);
+
+-- ============================================================================
+-- REFRESH FUNCTIONS FOR MATERIALIZED VIEWS
+-- ============================================================================
+
+-- Function to refresh all materialized views
+CREATE OR REPLACE FUNCTION refresh_materialized_views()
+RETURNS VOID AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY popular_products;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY jeweler_performance;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- COMMENTS FOR DOCUMENTATION
+-- ============================================================================
+
+COMMENT ON TABLE user_favorite_products IS 'Junction table for user favorite products (many-to-many)';
+COMMENT ON TABLE user_favorite_jewelers IS 'Junction table for user favorite jewelers (many-to-many)';
+COMMENT ON TABLE categories IS 'Hierarchical product categories with parent-child relationships';
+COMMENT ON TABLE product_categories IS 'Junction table linking products to categories (many-to-many)';
+COMMENT ON TABLE tags IS 'Reusable tags for products and stories (emotion, style, material, occasion)';
+COMMENT ON TABLE product_tags IS 'Junction table linking products to tags (many-to-many)';
+COMMENT ON TABLE story_tags IS 'Junction table linking stories to tags (many-to-many)';
+
+COMMENT ON MATERIALIZED VIEW popular_products IS 'Aggregated product popularity metrics for performance';
+COMMENT ON MATERIALIZED VIEW jeweler_performance IS 'Aggregated jeweler performance metrics for rankings';
+
+COMMENT ON FUNCTION refresh_materialized_views() IS 'Refreshes all materialized views for updated analytics'; 
+
+================================================================================
+
+STEP 4: Security Policies
+
+-- GemsAI Row Level Security (RLS) Policies
+-- Implements comprehensive security policies for data protection
+
+-- ============================================================================
+-- ENABLE ROW LEVEL SECURITY
+-- ============================================================================
+
+-- Enable RLS on all core tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sketches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE jewelers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sketch_product_matches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+
+-- Enable RLS on junction tables
+ALTER TABLE user_favorite_products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_favorite_jewelers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE story_tags ENABLE ROW LEVEL SECURITY;
+
+-- Enable RLS on translation tables
+ALTER TABLE story_translations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_translations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE jeweler_translations ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
+-- HELPER FUNCTIONS FOR POLICIES
+-- ============================================================================
+
+-- Function to check if user is admin
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM users 
+        WHERE id = auth.uid() 
+        AND role = 'admin'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to check if user is jeweler
+CREATE OR REPLACE FUNCTION is_jeweler()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM users 
+        WHERE id = auth.uid() 
+        AND role = 'jeweler'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get user's jeweler ID
+CREATE OR REPLACE FUNCTION get_user_jeweler_id()
+RETURNS UUID AS $$
+BEGIN
+    RETURN (
+        SELECT j.id FROM jewelers j
+        WHERE j.user_id = auth.uid()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to check if user owns a jeweler profile
+CREATE OR REPLACE FUNCTION owns_jeweler_profile(jeweler_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM jewelers 
+        WHERE id = jeweler_id 
+        AND user_id = auth.uid()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- USERS TABLE POLICIES
+-- ============================================================================
+
+-- Users can view their own profile and public info of others
+CREATE POLICY "Users can view own profile and public info" ON users
+    FOR SELECT USING (
+        id = auth.uid() OR 
+        is_admin() OR
+        -- Public fields only for other users
+        TRUE
+    );
+
+-- Users can update their own profile
+CREATE POLICY "Users can update own profile" ON users
+    FOR UPDATE USING (id = auth.uid())
+    WITH CHECK (id = auth.uid());
+
+-- Only admins can insert users (handled by auth)
+CREATE POLICY "Only admins can insert users" ON users
+    FOR INSERT WITH CHECK (is_admin());
+
+-- Only admins can delete users
+CREATE POLICY "Only admins can delete users" ON users
+    FOR DELETE USING (is_admin());
+
+-- ============================================================================
+-- STORIES TABLE POLICIES
+-- ============================================================================
+
+-- Users can view their own stories
+CREATE POLICY "Users can view own stories" ON stories
+    FOR SELECT USING (
+        user_id = auth.uid() OR 
+        is_admin()
+    );
+
+-- Users can insert their own stories
+CREATE POLICY "Users can create own stories" ON stories
+    FOR INSERT WITH CHECK (user_id = auth.uid());
+
+-- Users can update their own stories
+CREATE POLICY "Users can update own stories" ON stories
+    FOR UPDATE USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+
+-- Users can delete their own stories
+CREATE POLICY "Users can delete own stories" ON stories
+    FOR DELETE USING (
+        user_id = auth.uid() OR 
+        is_admin()
+    );
+
+-- ============================================================================
+-- SKETCHES TABLE POLICIES
+-- ============================================================================
+
+-- Users can view sketches from their own stories
+CREATE POLICY "Users can view sketches from own stories" ON sketches
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM stories 
+            WHERE id = sketches.story_id 
+            AND user_id = auth.uid()
+        ) OR 
+        is_admin()
+    );
+
+-- System can insert sketches (AI generation)
+CREATE POLICY "System can insert sketches" ON sketches
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM stories 
+            WHERE id = story_id 
+            AND user_id = auth.uid()
+        ) OR 
+        is_admin()
+    );
+
+-- Users can update sketches from their own stories (ratings, feedback)
+CREATE POLICY "Users can update own sketches" ON sketches
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM stories 
+            WHERE id = sketches.story_id 
+            AND user_id = auth.uid()
+        )
+    ) WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM stories 
+            WHERE id = sketches.story_id 
+            AND user_id = auth.uid()
+        )
+    );
+
+-- ============================================================================
+-- JEWELERS TABLE POLICIES
+-- ============================================================================
+
+-- Anyone can view verified jeweler profiles (public)
+CREATE POLICY "Anyone can view verified jewelers" ON jewelers
+    FOR SELECT USING (
+        verification_status = 'verified' OR
+        user_id = auth.uid() OR
+        is_admin()
+    );
+
+-- Users can create their own jeweler profile
+CREATE POLICY "Users can create own jeweler profile" ON jewelers
+    FOR INSERT WITH CHECK (user_id = auth.uid());
+
+-- Jewelers can update their own profile
+CREATE POLICY "Jewelers can update own profile" ON jewelers
+    FOR UPDATE USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+
+-- Only admins can delete jeweler profiles
+CREATE POLICY "Only admins can delete jewelers" ON jewelers
+    FOR DELETE USING (is_admin());
+
+-- ============================================================================
+-- PRODUCTS TABLE POLICIES
+-- ============================================================================
+
+-- Anyone can view available products from verified jewelers
+CREATE POLICY "Anyone can view available products" ON products
+    FOR SELECT USING (
+        (is_available = TRUE AND EXISTS (
+            SELECT 1 FROM jewelers 
+            WHERE id = products.jeweler_id 
+            AND verification_status = 'verified'
+        )) OR
+        jeweler_id = get_user_jeweler_id() OR
+        is_admin()
+    );
+
+-- Jewelers can insert their own products
+CREATE POLICY "Jewelers can create own products" ON products
+    FOR INSERT WITH CHECK (
+        jeweler_id = get_user_jeweler_id()
+    );
+
+-- Jewelers can update their own products
+CREATE POLICY "Jewelers can update own products" ON products
+    FOR UPDATE USING (jeweler_id = get_user_jeweler_id())
+    WITH CHECK (jeweler_id = get_user_jeweler_id());
+
+-- Jewelers can delete their own products
+CREATE POLICY "Jewelers can delete own products" ON products
+    FOR DELETE USING (
+        jeweler_id = get_user_jeweler_id() OR
+        is_admin()
+    );
+
+-- ============================================================================
+-- ORDERS TABLE POLICIES
+-- ============================================================================
+
+-- Users can view their own orders, jewelers can view orders for their products
+CREATE POLICY "Users and jewelers can view relevant orders" ON orders
+    FOR SELECT USING (
+        user_id = auth.uid() OR
+        jeweler_id = get_user_jeweler_id() OR
+        is_admin()
+    );
+
+-- Users can create orders
+CREATE POLICY "Users can create orders" ON orders
+    FOR INSERT WITH CHECK (user_id = auth.uid());
+
+-- Users can update their own orders (limited fields), jewelers can update order status
+CREATE POLICY "Users and jewelers can update relevant orders" ON orders
+    FOR UPDATE USING (
+        user_id = auth.uid() OR
+        jeweler_id = get_user_jeweler_id() OR
+        is_admin()
+    ) WITH CHECK (
+        user_id = auth.uid() OR
+        jeweler_id = get_user_jeweler_id() OR
+        is_admin()
+    );
+
+-- Only admins can delete orders
+CREATE POLICY "Only admins can delete orders" ON orders
+    FOR DELETE USING (is_admin());
+
+-- ============================================================================
+-- GIFTS TABLE POLICIES
+-- ============================================================================
+
+-- Users can view gifts they sent or received
+CREATE POLICY "Users can view relevant gifts" ON gifts
+    FOR SELECT USING (
+        sender_id = auth.uid() OR
+        recipient_email = (SELECT email FROM users WHERE id = auth.uid()) OR
+        is_admin()
+    );
+
+-- Users can create gifts
+CREATE POLICY "Users can create gifts" ON gifts
+    FOR INSERT WITH CHECK (sender_id = auth.uid());
+
+-- Users can update gifts they sent
+CREATE POLICY "Users can update own gifts" ON gifts
+    FOR UPDATE USING (sender_id = auth.uid())
+    WITH CHECK (sender_id = auth.uid());
+
+-- Users can delete gifts they sent (before viewed)
+CREATE POLICY "Users can delete own unviewed gifts" ON gifts
+    FOR DELETE USING (
+        sender_id = auth.uid() AND viewed_at IS NULL OR
+        is_admin()
+    );
+
+-- ============================================================================
+-- SKETCH PRODUCT MATCHES TABLE POLICIES
+-- ============================================================================
+
+-- Users can view matches for their sketches
+CREATE POLICY "Users can view matches for own sketches" ON sketch_product_matches
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM sketches s
+            JOIN stories st ON s.id = sketch_product_matches.sketch_id
+            WHERE st.user_id = auth.uid()
+        ) OR
+        is_admin()
+    );
+
+-- System can insert matches (AI matching)
+CREATE POLICY "System can insert matches" ON sketch_product_matches
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM sketches s
+            JOIN stories st ON s.id = sketch_id
+            WHERE st.user_id = auth.uid()
+        ) OR
+        is_admin()
+    );
+
+-- ============================================================================
+-- USER PREFERENCES TABLE POLICIES
+-- ============================================================================
+
+-- Users can view and manage their own preferences
+CREATE POLICY "Users can manage own preferences" ON user_preferences
+    FOR ALL USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+
+-- ============================================================================
+-- REVIEWS TABLE POLICIES
+-- ============================================================================
+
+-- Anyone can view published reviews
+CREATE POLICY "Anyone can view reviews" ON reviews
+    FOR SELECT USING (TRUE);
+
+-- Users can create reviews for their delivered orders
+CREATE POLICY "Users can create reviews for own orders" ON reviews
+    FOR INSERT WITH CHECK (
+        user_id = auth.uid() AND
+        EXISTS (
+            SELECT 1 FROM orders 
+            WHERE id = order_id 
+            AND user_id = auth.uid() 
+            AND status = 'delivered'
+        )
+    );
+
+-- Users can update their own reviews
+CREATE POLICY "Users can update own reviews" ON reviews
+    FOR UPDATE USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+
+-- Users can delete their own reviews
+CREATE POLICY "Users can delete own reviews" ON reviews
+    FOR DELETE USING (
+        user_id = auth.uid() OR
+        is_admin()
+    );
+
+-- ============================================================================
+-- JUNCTION TABLES POLICIES
+-- ============================================================================
+
+-- User favorite products
+CREATE POLICY "Users can manage own favorite products" ON user_favorite_products
+    FOR ALL USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+
+-- User favorite jewelers
+CREATE POLICY "Users can manage own favorite jewelers" ON user_favorite_jewelers
+    FOR ALL USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+
+-- Product categories - anyone can view, jewelers can manage for their products
+CREATE POLICY "Anyone can view product categories" ON product_categories
+    FOR SELECT USING (TRUE);
+
+CREATE POLICY "Jewelers can manage own product categories" ON product_categories
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM products 
+            WHERE id = product_id 
+            AND jeweler_id = get_user_jeweler_id()
+        )
+    );
+
+CREATE POLICY "Jewelers can update own product categories" ON product_categories
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM products 
+            WHERE id = product_id 
+            AND jeweler_id = get_user_jeweler_id()
+        )
+    ) WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM products 
+            WHERE id = product_id 
+            AND jeweler_id = get_user_jeweler_id()
+        )
+    );
+
+CREATE POLICY "Jewelers can delete own product categories" ON product_categories
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM products 
+            WHERE id = product_id 
+            AND jeweler_id = get_user_jeweler_id()
+        ) OR
+        is_admin()
+    );
+
+-- Product tags - similar to categories
+CREATE POLICY "Anyone can view product tags" ON product_tags
+    FOR SELECT USING (TRUE);
+
+CREATE POLICY "Jewelers can manage own product tags" ON product_tags
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM products 
+            WHERE id = product_id 
+            AND jeweler_id = get_user_jeweler_id()
+        )
+    );
+
+CREATE POLICY "Jewelers can update own product tags" ON product_tags
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM products 
+            WHERE id = product_id 
+            AND jeweler_id = get_user_jeweler_id()
+        )
+    ) WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM products 
+            WHERE id = product_id 
+            AND jeweler_id = get_user_jeweler_id()
+        )
+    );
+
+CREATE POLICY "Jewelers can delete own product tags" ON product_tags
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM products 
+            WHERE id = product_id 
+            AND jeweler_id = get_user_jeweler_id()
+        ) OR
+        is_admin()
+    );
+
+-- Story tags - users can manage tags for their own stories
+CREATE POLICY "Users can manage own story tags" ON story_tags
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM stories 
+            WHERE id = story_id 
+            AND user_id = auth.uid()
+        ) OR
+        is_admin()
+    ) WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM stories 
+            WHERE id = story_id 
+            AND user_id = auth.uid()
+        ) OR
+        is_admin()
+    );
+
+-- ============================================================================
+-- TRANSLATION TABLES POLICIES
+-- ============================================================================
+
+-- Anyone can view published translations
+CREATE POLICY "Anyone can view story translations" ON story_translations
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM translation_metadata tm
+            WHERE tm.entity_type = 'story'
+            AND tm.entity_id = story_id
+            AND tm.language_id = story_translations.language_id
+            AND tm.translation_status = 'published'
+        ) OR
+        EXISTS (
+            SELECT 1 FROM stories 
+            WHERE id = story_id 
+            AND user_id = auth.uid()
+        ) OR
+        is_admin()
+    );
+
+CREATE POLICY "Anyone can view product translations" ON product_translations
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM translation_metadata tm
+            WHERE tm.entity_type = 'product'
+            AND tm.entity_id = product_id
+            AND tm.language_id = product_translations.language_id
+            AND tm.translation_status = 'published'
+        ) OR
+        EXISTS (
+            SELECT 1 FROM products p
+            JOIN jewelers j ON p.jeweler_id = j.id
+            WHERE p.id = product_id 
+            AND j.user_id = auth.uid()
+        ) OR
+        is_admin()
+    );
+
+CREATE POLICY "Anyone can view jeweler translations" ON jeweler_translations
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM translation_metadata tm
+            WHERE tm.entity_type = 'jeweler'
+            AND tm.entity_id = jeweler_id
+            AND tm.language_id = jeweler_translations.language_id
+            AND tm.translation_status = 'published'
+        ) OR
+        EXISTS (
+            SELECT 1 FROM jewelers 
+            WHERE id = jeweler_id 
+            AND user_id = auth.uid()
+        ) OR
+        is_admin()
+    );
+
+-- ============================================================================
+-- PUBLIC TABLES (NO RLS NEEDED)
+-- ============================================================================
+
+-- These tables are public and don't need RLS:
+-- - languages
+-- - categories
+-- - tags
+-- - system_translations
+-- - enum_translations
+
+-- ============================================================================
+-- SECURITY FUNCTIONS FOR APPLICATION USE
+-- ============================================================================
+
+-- Function to check if user can access order
+CREATE OR REPLACE FUNCTION can_access_order(order_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM orders o
+        LEFT JOIN jewelers j ON o.jeweler_id = j.id
+        WHERE o.id = order_id
+        AND (
+            o.user_id = auth.uid() OR
+            j.user_id = auth.uid() OR
+            is_admin()
+        )
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to check if user can access gift
+CREATE OR REPLACE FUNCTION can_access_gift(gift_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM gifts g
+        LEFT JOIN users u ON g.recipient_email = u.email
+        WHERE g.id = gift_id
+        AND (
+            g.sender_id = auth.uid() OR
+            u.id = auth.uid() OR
+            is_admin()
+        )
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to check if user can manage product
+CREATE OR REPLACE FUNCTION can_manage_product(product_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM products p
+        JOIN jewelers j ON p.jeweler_id = j.id
+        WHERE p.id = product_id
+        AND (
+            j.user_id = auth.uid() OR
+            is_admin()
+        )
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- AUDIT LOGGING SETUP
+-- ============================================================================
+
+-- Create audit log table
+CREATE TABLE IF NOT EXISTS audit_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    table_name TEXT NOT NULL,
+    operation TEXT NOT NULL CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE')),
+    old_data JSONB,
+    new_data JSONB,
+    user_id UUID REFERENCES users(id),
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS on audit log
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+
+-- Only admins can view audit logs
+CREATE POLICY "Only admins can view audit logs" ON audit_log
+    FOR SELECT USING (is_admin());
+
+-- Audit trigger function
+CREATE OR REPLACE FUNCTION audit_trigger()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        INSERT INTO audit_log (table_name, operation, old_data, user_id)
+        VALUES (TG_TABLE_NAME, TG_OP, row_to_json(OLD), auth.uid());
+        RETURN OLD;
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO audit_log (table_name, operation, old_data, new_data, user_id)
+        VALUES (TG_TABLE_NAME, TG_OP, row_to_json(OLD), row_to_json(NEW), auth.uid());
+        RETURN NEW;
+    ELSIF TG_OP = 'INSERT' THEN
+        INSERT INTO audit_log (table_name, operation, new_data, user_id)
+        VALUES (TG_TABLE_NAME, TG_OP, row_to_json(NEW), auth.uid());
+        RETURN NEW;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Apply audit triggers to sensitive tables
+CREATE TRIGGER audit_users AFTER INSERT OR UPDATE OR DELETE ON users
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger();
+
+CREATE TRIGGER audit_orders AFTER INSERT OR UPDATE OR DELETE ON orders
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger();
+
+CREATE TRIGGER audit_jewelers AFTER INSERT OR UPDATE OR DELETE ON jewelers
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger();
+
+-- ============================================================================
+-- COMMENTS FOR DOCUMENTATION
+-- ============================================================================
+
+COMMENT ON FUNCTION is_admin() IS 'Helper function to check if current user is admin';
+COMMENT ON FUNCTION is_jeweler() IS 'Helper function to check if current user is jeweler';
+COMMENT ON FUNCTION get_user_jeweler_id() IS 'Helper function to get jeweler ID for current user';
+COMMENT ON FUNCTION can_access_order(UUID) IS 'Security function to check order access permissions';
+COMMENT ON FUNCTION can_access_gift(UUID) IS 'Security function to check gift access permissions';
+COMMENT ON FUNCTION can_manage_product(UUID) IS 'Security function to check product management permissions';
+COMMENT ON TABLE audit_log IS 'Audit trail for sensitive operations';
+COMMENT ON FUNCTION audit_trigger() IS 'Trigger function for audit logging'; 
+
+================================================================================
+
+STEP 5: Performance Optimization
+
+-- GemsAI Performance Optimization
+-- Advanced indexing, query optimization, and performance monitoring
+
+-- ============================================================================
+-- ADVANCED INDEXES FOR PERFORMANCE
+-- ============================================================================
+
+-- Full-text search indexes with Hebrew support
+CREATE INDEX IF NOT EXISTS idx_story_translations_search_he
+ON story_translations USING GIN(to_tsvector('hebrew', title || ' ' || COALESCE(content, '')))
+WHERE language_id = 'he';
+
+CREATE INDEX IF NOT EXISTS idx_story_translations_search_en
+ON story_translations USING GIN(to_tsvector('english', title || ' ' || COALESCE(content, '')))
+WHERE language_id = 'en';
+
+CREATE INDEX IF NOT EXISTS idx_product_translations_search_he
+ON product_translations USING GIN(to_tsvector('hebrew', name || ' ' || COALESCE(description, '')))
+WHERE language_id = 'he';
+
+CREATE INDEX IF NOT EXISTS idx_product_translations_search_en
+ON product_translations USING GIN(to_tsvector('english', name || ' ' || COALESCE(description, '')))
+WHERE language_id = 'en';
+
+-- Composite indexes for common query patterns
+CREATE INDEX IF NOT EXISTS idx_products_jeweler_available_featured 
+ON products(jeweler_id, is_available, featured) 
+WHERE is_available = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_orders_user_status_created 
+ON orders(user_id, status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_orders_jeweler_status_created 
+ON orders(jeweler_id, status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sketches_story_status_created 
+ON sketches(story_id, status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_jeweler_rating_created 
+ON reviews(jeweler_id, rating, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_product_rating_created 
+ON reviews(product_id, rating, created_at DESC);
+
+-- Partial indexes for specific conditions
+CREATE INDEX IF NOT EXISTS idx_gifts_active_tokens 
+ON gifts(share_token) 
+WHERE status IN ('created', 'sent') AND expires_at > NOW();
+
+CREATE INDEX IF NOT EXISTS idx_orders_pending_payment 
+ON orders(created_at DESC) 
+WHERE payment_status = 'pending';
+
+CREATE INDEX IF NOT EXISTS idx_jewelers_verified_rating 
+ON jewelers(rating DESC, total_orders DESC) 
+WHERE verification_status = 'verified';
+
+-- Expression indexes for calculated fields
+CREATE INDEX IF NOT EXISTS idx_orders_total_amount_ils 
+ON orders((total_amount * CASE WHEN currency = 'USD' THEN 3.7 WHEN currency = 'EUR' THEN 4.0 ELSE 1 END))
+WHERE currency IN ('ILS', 'USD', 'EUR');
+
+-- Array indexes for tag searches
+CREATE INDEX IF NOT EXISTS idx_products_emotion_tags_gin 
+ON products USING GIN(emotion_tags);
+
+CREATE INDEX IF NOT EXISTS idx_products_style_tags_gin 
+ON products USING GIN(style_tags);
+
+CREATE INDEX IF NOT EXISTS idx_products_materials_gin 
+ON products USING GIN(materials);
+
+-- Geographic indexes for location-based searches
+CREATE INDEX IF NOT EXISTS idx_jewelers_location 
+ON jewelers(location_country, location_city) 
+WHERE verification_status = 'verified';
+
+-- ============================================================================
+-- QUERY OPTIMIZATION VIEWS
+-- ============================================================================
+
+-- Optimized view for product search with all relevant data
+CREATE OR REPLACE VIEW products_search_optimized AS
+SELECT 
+    p.id,
+    p.jeweler_id,
+    p.price,
+    p.currency,
+    p.images,
+    p.category,
+    p.materials,
+    p.emotion_tags,
+    p.style_tags,
+    p.featured,
+    p.is_available,
+    p.lead_time_days,
+    p.created_at,
+    -- Jeweler info
+    j.verification_status,
+    j.rating as jeweler_rating,
+    j.total_orders as jeweler_total_orders,
+    j.location_city,
+    j.location_country,
+    -- Product translations
+    pt_he.name as name_he,
+    pt_he.description as description_he,
+    pt_he.short_description as short_description_he,
+    pt_en.name as name_en,
+    pt_en.description as description_en,
+    pt_en.short_description as short_description_en,
+    -- Aggregated metrics
+    COALESCE(pp.avg_rating, 0) as avg_rating,
+    COALESCE(pp.review_count, 0) as review_count,
+    COALESCE(pp.order_count, 0) as order_count,
+    COALESCE(pp.favorite_count, 0) as favorite_count
+FROM products p
+JOIN jewelers j ON p.jeweler_id = j.id
+LEFT JOIN product_translations pt_he ON p.id = pt_he.product_id AND pt_he.language_id = 'he'
+LEFT JOIN product_translations pt_en ON p.id = pt_en.product_id AND pt_en.language_id = 'en'
+LEFT JOIN popular_products pp ON p.id = pp.id
+WHERE p.is_available = TRUE 
+AND j.verification_status = 'verified';
+
+-- Optimized view for jeweler profiles with metrics
+CREATE OR REPLACE VIEW jewelers_profile_optimized AS
+SELECT 
+    j.id,
+    j.user_id,
+    j.business_name,
+    j.portfolio_url,
+    j.verification_status,
+    j.rating,
+    j.total_orders,
+    j.response_time_hours,
+    j.location_city,
+    j.location_country,
+    j.specialties,
+    j.years_experience,
+    j.created_at,
+    -- User info
+    u.name as user_name,
+    u.avatar_url,
+    -- Jeweler translations
+    jt_he.name as name_he,
+    jt_he.bio as bio_he,
+    jt_he.tagline as tagline_he,
+    jt_en.name as name_en,
+    jt_en.bio as bio_en,
+    jt_en.tagline as tagline_en,
+    -- Performance metrics
+    COALESCE(jp.completed_orders, 0) as completed_orders,
+    COALESCE(jp.avg_rating, 0) as avg_rating,
+    COALESCE(jp.review_count, 0) as review_count,
+    COALESCE(jp.avg_delivery_days, 0) as avg_delivery_days,
+    -- Product counts
+    (SELECT COUNT(*) FROM products WHERE jeweler_id = j.id AND is_available = TRUE) as active_products
+FROM jewelers j
+JOIN users u ON j.user_id = u.id
+LEFT JOIN jeweler_translations jt_he ON j.id = jt_he.jeweler_id AND jt_he.language_id = 'he'
+LEFT JOIN jeweler_translations jt_en ON j.id = jt_en.jeweler_id AND jt_en.language_id = 'en'
+LEFT JOIN jeweler_performance jp ON j.id = jp.id
+WHERE j.verification_status = 'verified';
+
+-- User dashboard view with all relevant data
+CREATE OR REPLACE VIEW user_dashboard_optimized AS
+SELECT 
+    u.id,
+    u.email,
+    u.name,
+    u.avatar_url,
+    u.role,
+    u.preferred_language,
+    -- User stats
+    (SELECT COUNT(*) FROM stories WHERE user_id = u.id) as total_stories,
+    (SELECT COUNT(*) FROM sketches s JOIN stories st ON s.story_id = st.id WHERE st.user_id = u.id) as total_sketches,
+    (SELECT COUNT(*) FROM orders WHERE user_id = u.id) as total_orders,
+    (SELECT COUNT(*) FROM reviews WHERE user_id = u.id) as total_reviews,
+    (SELECT COUNT(*) FROM gifts WHERE sender_id = u.id) as gifts_sent,
+    (SELECT COUNT(*) FROM gifts WHERE recipient_email = u.email) as gifts_received,
+    -- Recent activity
+    (SELECT MAX(created_at) FROM stories WHERE user_id = u.id) as last_story_created,
+    (SELECT MAX(created_at) FROM orders WHERE user_id = u.id) as last_order_created,
+    -- Preferences
+    up.preferred_styles,
+    up.preferred_materials,
+    up.budget_range,
+    up.notification_settings,
+    up.privacy_settings
+FROM users u
+LEFT JOIN user_preferences up ON u.id = up.user_id;
+
+-- ============================================================================
+-- PERFORMANCE MONITORING FUNCTIONS
+-- ============================================================================
+
+-- Function to get slow queries
+CREATE OR REPLACE FUNCTION get_slow_queries(min_duration_ms INTEGER DEFAULT 1000)
+RETURNS TABLE (
+    query TEXT,
+    calls BIGINT,
+    total_time DOUBLE PRECISION,
+    mean_time DOUBLE PRECISION,
+    max_time DOUBLE PRECISION,
+    stddev_time DOUBLE PRECISION
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        pg_stat_statements.query,
+        pg_stat_statements.calls,
+        pg_stat_statements.total_exec_time,
+        pg_stat_statements.mean_exec_time,
+        pg_stat_statements.max_exec_time,
+        pg_stat_statements.stddev_exec_time
+    FROM pg_stat_statements
+    WHERE pg_stat_statements.mean_exec_time > min_duration_ms
+    ORDER BY pg_stat_statements.mean_exec_time DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get index usage statistics
+CREATE OR REPLACE FUNCTION get_index_usage()
+RETURNS TABLE (
+    schemaname TEXT,
+    tablename TEXT,
+    indexname TEXT,
+    idx_scan BIGINT,
+    idx_tup_read BIGINT,
+    idx_tup_fetch BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        pg_stat_user_indexes.schemaname,
+        pg_stat_user_indexes.relname,
+        pg_stat_user_indexes.indexrelname,
+        pg_stat_user_indexes.idx_scan,
+        pg_stat_user_indexes.idx_tup_read,
+        pg_stat_user_indexes.idx_tup_fetch
+    FROM pg_stat_user_indexes
+    ORDER BY pg_stat_user_indexes.idx_scan DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get table size information
+CREATE OR REPLACE FUNCTION get_table_sizes()
+RETURNS TABLE (
+    table_name TEXT,
+    row_count BIGINT,
+    total_size TEXT,
+    index_size TEXT,
+    toast_size TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        schemaname||'.'||tablename as table_name,
+        n_tup_ins - n_tup_del as row_count,
+        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as total_size,
+        pg_size_pretty(pg_indexes_size(schemaname||'.'||tablename)) as index_size,
+        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename) - pg_relation_size(schemaname||'.'||tablename)) as toast_size
+    FROM pg_stat_user_tables
+    ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- QUERY OPTIMIZATION FUNCTIONS
+-- ============================================================================
+
+-- Function for optimized product search
+CREATE OR REPLACE FUNCTION search_products(
+    search_text TEXT DEFAULT NULL,
+    emotion_tags_filter TEXT[] DEFAULT NULL,
+    style_tags_filter TEXT[] DEFAULT NULL,
+    price_min DECIMAL DEFAULT NULL,
+    price_max DECIMAL DEFAULT NULL,
+    jeweler_location TEXT DEFAULT NULL,
+    language_code TEXT DEFAULT 'he',
+    limit_count INTEGER DEFAULT 20,
+    offset_count INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+    id UUID,
+    name TEXT,
+    description TEXT,
+    price DECIMAL,
+    currency TEXT,
+    images TEXT[],
+    jeweler_name TEXT,
+    jeweler_rating DECIMAL,
+    avg_rating DECIMAL,
+    review_count INTEGER
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id,
+        CASE 
+            WHEN language_code = 'he' THEN COALESCE(p.name_he, p.name_en)
+            ELSE COALESCE(p.name_en, p.name_he)
+        END as name,
+        CASE 
+            WHEN language_code = 'he' THEN COALESCE(p.description_he, p.description_en)
+            ELSE COALESCE(p.description_en, p.description_he)
+        END as description,
+        p.price,
+        p.currency,
+        p.images,
+        CASE 
+            WHEN language_code = 'he' THEN COALESCE(p.name_he, p.name_en)
+            ELSE COALESCE(p.name_en, p.name_he)
+        END as jeweler_name,
+        p.jeweler_rating,
+        p.avg_rating,
+        p.review_count::INTEGER
+    FROM products_search_optimized p
+    WHERE 
+        (search_text IS NULL OR (
+            CASE 
+                WHEN language_code = 'he' THEN 
+                    to_tsvector('hebrew', COALESCE(p.name_he, '') || ' ' || COALESCE(p.description_he, '')) 
+                    @@ plainto_tsquery('hebrew', search_text)
+                ELSE 
+                    to_tsvector('english', COALESCE(p.name_en, '') || ' ' || COALESCE(p.description_en, '')) 
+                    @@ plainto_tsquery('english', search_text)
+            END
+        ))
+        AND (emotion_tags_filter IS NULL OR p.emotion_tags && emotion_tags_filter)
+        AND (style_tags_filter IS NULL OR p.style_tags && style_tags_filter)
+        AND (price_min IS NULL OR p.price >= price_min)
+        AND (price_max IS NULL OR p.price <= price_max)
+        AND (jeweler_location IS NULL OR p.location_city ILIKE '%' || jeweler_location || '%')
+    ORDER BY 
+        p.featured DESC,
+        p.avg_rating DESC,
+        p.review_count DESC,
+        p.created_at DESC
+    LIMIT limit_count
+    OFFSET offset_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function for optimized jeweler search
+CREATE OR REPLACE FUNCTION search_jewelers(
+    search_text TEXT DEFAULT NULL,
+    location_filter TEXT DEFAULT NULL,
+    specialties_filter TEXT[] DEFAULT NULL,
+    min_rating DECIMAL DEFAULT NULL,
+    language_code TEXT DEFAULT 'he',
+    limit_count INTEGER DEFAULT 20,
+    offset_count INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+    id UUID,
+    name TEXT,
+    bio TEXT,
+    rating DECIMAL,
+    total_orders INTEGER,
+    location_city TEXT,
+    location_country TEXT,
+    active_products BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        j.id,
+        CASE 
+            WHEN language_code = 'he' THEN COALESCE(j.name_he, j.name_en, j.business_name)
+            ELSE COALESCE(j.name_en, j.name_he, j.business_name)
+        END as name,
+        CASE 
+            WHEN language_code = 'he' THEN COALESCE(j.bio_he, j.bio_en)
+            ELSE COALESCE(j.bio_en, j.bio_he)
+        END as bio,
+        j.rating,
+        j.total_orders,
+        j.location_city,
+        j.location_country,
+        j.active_products
+    FROM jewelers_profile_optimized j
+    WHERE 
+        (search_text IS NULL OR (
+            CASE 
+                WHEN language_code = 'he' THEN 
+                    to_tsvector('hebrew', COALESCE(j.name_he, '') || ' ' || COALESCE(j.bio_he, '')) 
+                    @@ plainto_tsquery('hebrew', search_text)
+                ELSE 
+                    to_tsvector('english', COALESCE(j.name_en, '') || ' ' || COALESCE(j.bio_en, '')) 
+                    @@ plainto_tsquery('english', search_text)
+            END
+        ))
+        AND (location_filter IS NULL OR j.location_city ILIKE '%' || location_filter || '%')
+        AND (specialties_filter IS NULL OR j.specialties && specialties_filter)
+        AND (min_rating IS NULL OR j.rating >= min_rating)
+    ORDER BY 
+        j.rating DESC,
+        j.total_orders DESC,
+        j.active_products DESC
+    LIMIT limit_count
+    OFFSET offset_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- CACHING STRATEGIES
+-- ============================================================================
+
+-- Function to refresh materialized views on schedule
+CREATE OR REPLACE FUNCTION refresh_analytics_views()
+RETURNS VOID AS $$
+BEGIN
+    -- Refresh popular products
+    REFRESH MATERIALIZED VIEW CONCURRENTLY popular_products;
+    
+    -- Refresh jeweler performance
+    REFRESH MATERIALIZED VIEW CONCURRENTLY jeweler_performance;
+    
+    -- Log the refresh
+    INSERT INTO system_log (event_type, message, created_at)
+    VALUES ('analytics_refresh', 'Materialized views refreshed successfully', NOW());
+    
+EXCEPTION WHEN OTHERS THEN
+    -- Log any errors
+    INSERT INTO system_log (event_type, message, error_details, created_at)
+    VALUES ('analytics_refresh_error', 'Failed to refresh materialized views', SQLERRM, NOW());
+    RAISE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create system log table for monitoring
+CREATE TABLE IF NOT EXISTS system_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_type VARCHAR(50) NOT NULL,
+    message TEXT NOT NULL,
+    error_details TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_log_event_type_created 
+ON system_log(event_type, created_at DESC);
+
+-- ============================================================================
+-- PARTITIONING STRATEGIES
+-- ============================================================================
+
+-- Function to create monthly partitions for orders
+CREATE OR REPLACE FUNCTION create_monthly_partition(table_name TEXT, start_date DATE)
+RETURNS VOID AS $$
+DECLARE
+    partition_name TEXT;
+    end_date DATE;
+BEGIN
+    partition_name := table_name || '_' || to_char(start_date, 'YYYY_MM');
+    end_date := start_date + INTERVAL '1 month';
+    
+    EXECUTE format('
+        CREATE TABLE IF NOT EXISTS %I PARTITION OF %I
+        FOR VALUES FROM (%L) TO (%L)',
+        partition_name, table_name, start_date, end_date
+    );
+    
+    -- Create indexes on partition
+    EXECUTE format('
+        CREATE INDEX IF NOT EXISTS %I ON %I (user_id, created_at DESC)',
+        'idx_' || partition_name || '_user_created', partition_name
+    );
+    
+    EXECUTE format('
+        CREATE INDEX IF NOT EXISTS %I ON %I (jeweler_id, created_at DESC)',
+        'idx_' || partition_name || '_jeweler_created', partition_name
+    );
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- PERFORMANCE MONITORING VIEWS
+-- ============================================================================
+
+-- View for monitoring query performance
+CREATE OR REPLACE VIEW query_performance_monitor AS
+SELECT 
+    query,
+    calls,
+    total_exec_time,
+    mean_exec_time,
+    max_exec_time,
+    stddev_exec_time,
+    rows,
+    100.0 * shared_blks_hit / nullif(shared_blks_hit + shared_blks_read, 0) AS hit_percent
+FROM pg_stat_statements
+WHERE calls > 10
+ORDER BY mean_exec_time DESC;
+
+-- View for monitoring table statistics
+CREATE OR REPLACE VIEW table_performance_monitor AS
+SELECT 
+    schemaname,
+    tablename,
+    n_tup_ins as inserts,
+    n_tup_upd as updates,
+    n_tup_del as deletes,
+    n_live_tup as live_tuples,
+    n_dead_tup as dead_tuples,
+    last_vacuum,
+    last_autovacuum,
+    last_analyze,
+    last_autoanalyze,
+    vacuum_count,
+    autovacuum_count,
+    analyze_count,
+    autoanalyze_count
+FROM pg_stat_user_tables
+ORDER BY n_live_tup DESC;
+
+-- ============================================================================
+-- CLEANUP AND MAINTENANCE FUNCTIONS
+-- ============================================================================
+
+-- Function to clean up old audit logs
+CREATE OR REPLACE FUNCTION cleanup_old_audit_logs(days_to_keep INTEGER DEFAULT 90)
+RETURNS INTEGER AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM audit_log 
+    WHERE timestamp < NOW() - INTERVAL '1 day' * days_to_keep;
+    
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    
+    INSERT INTO system_log (event_type, message, metadata, created_at)
+    VALUES ('audit_cleanup', 'Cleaned up old audit logs', 
+            jsonb_build_object('deleted_count', deleted_count, 'days_kept', days_to_keep), 
+            NOW());
+    
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to clean up expired gifts
+CREATE OR REPLACE FUNCTION cleanup_expired_gifts()
+RETURNS INTEGER AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    UPDATE gifts 
+    SET status = 'expired' 
+    WHERE expires_at < NOW() 
+    AND status NOT IN ('expired', 'viewed');
+    
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    
+    INSERT INTO system_log (event_type, message, metadata, created_at)
+    VALUES ('gift_cleanup', 'Marked expired gifts', 
+            jsonb_build_object('expired_count', deleted_count), 
+            NOW());
+    
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- COMMENTS FOR DOCUMENTATION
+-- ============================================================================
+
+COMMENT ON VIEW products_search_optimized IS 'Optimized view for product search with all relevant data pre-joined';
+COMMENT ON VIEW jewelers_profile_optimized IS 'Optimized view for jeweler profiles with performance metrics';
+COMMENT ON VIEW user_dashboard_optimized IS 'Optimized view for user dashboard with aggregated statistics';
+
+COMMENT ON FUNCTION search_products IS 'Optimized product search function with full-text search and filtering';
+COMMENT ON FUNCTION search_jewelers IS 'Optimized jeweler search function with location and specialty filtering';
+COMMENT ON FUNCTION refresh_analytics_views IS 'Refreshes all materialized views for analytics';
+COMMENT ON FUNCTION cleanup_old_audit_logs IS 'Removes audit logs older than specified days';
+COMMENT ON FUNCTION cleanup_expired_gifts IS 'Marks expired gifts and cleans up old data';
+
+COMMENT ON TABLE system_log IS 'System event logging for monitoring and debugging'; 
+
+================================================================================
+
+STEP 6: Demo Data
+
+-- GemsAI Seed Data
+-- Initial data population for development, testing, and demonstration
+
+-- ============================================================================
+-- REFERENCE DATA (Required for system operation)
+-- ============================================================================
+
+-- Languages (Core system languages)
+INSERT INTO languages (id, name, native_name, direction, is_active) VALUES
+('he', 'Hebrew', 'עברית', 'rtl', true),
+('en', 'English', 'English', 'ltr', true),
+('ar', 'Arabic', 'العربية', 'rtl', true),
+('fr', 'French', 'Français', 'ltr', false),
+('es', 'Spanish', 'Español', 'ltr', false)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    native_name = EXCLUDED.native_name,
+    direction = EXCLUDED.direction,
+    is_active = EXCLUDED.is_active;
+
+-- Categories (Jewelry categories)
+INSERT INTO categories (id, name, description, sort_order, is_active) VALUES
+(uuid_generate_v4(), 'Rings', 'Wedding rings, engagement rings, and fashion rings', 1, true),
+(uuid_generate_v4(), 'Necklaces', 'Necklaces, pendants, and chains', 2, true),
+(uuid_generate_v4(), 'Earrings', 'Earrings, studs, and ear accessories', 3, true),
+(uuid_generate_v4(), 'Bracelets', 'Bracelets, bangles, and wrist accessories', 4, true),
+(uuid_generate_v4(), 'Watches', 'Luxury watches and timepieces', 5, true),
+(uuid_generate_v4(), 'Custom', 'Custom and bespoke jewelry pieces', 6, true),
+(uuid_generate_v4(), 'Sets', 'Matching jewelry sets', 7, true),
+(uuid_generate_v4(), 'Accessories', 'Jewelry accessories and findings', 8, true)
+ON CONFLICT DO NOTHING;
+
+-- Tags (Emotion, style, material, occasion tags)
+INSERT INTO tags (id, name, type, description, color, is_active) VALUES
+-- Emotion tags
+(uuid_generate_v4(), 'Love', 'emotion', 'Romantic and loving pieces', '#FF69B4', true),
+(uuid_generate_v4(), 'Joy', 'emotion', 'Joyful and celebratory pieces', '#FFD700', true),
+(uuid_generate_v4(), 'Elegance', 'emotion', 'Sophisticated and refined pieces', '#4B0082', true),
+(uuid_generate_v4(), 'Strength', 'emotion', 'Bold and powerful pieces', '#8B0000', true),
+(uuid_generate_v4(), 'Peace', 'emotion', 'Calming and serene pieces', '#87CEEB', true),
+(uuid_generate_v4(), 'Passion', 'emotion', 'Intense and passionate pieces', '#DC143C', true),
+(uuid_generate_v4(), 'Hope', 'emotion', 'Optimistic and uplifting pieces', '#32CD32', true),
+(uuid_generate_v4(), 'Memory', 'emotion', 'Nostalgic and commemorative pieces', '#DDA0DD', true),
+
+-- Style tags
+(uuid_generate_v4(), 'Modern', 'style', 'Contemporary and current design', '#00CED1', true),
+(uuid_generate_v4(), 'Classic', 'style', 'Timeless and traditional design', '#2F4F4F', true),
+(uuid_generate_v4(), 'Vintage', 'style', 'Retro and antique-inspired design', '#8B4513', true),
+(uuid_generate_v4(), 'Minimalist', 'style', 'Simple and clean design', '#F5F5F5', true),
+(uuid_generate_v4(), 'Bohemian', 'style', 'Free-spirited and artistic design', '#CD853F', true),
+(uuid_generate_v4(), 'Art Deco', 'style', 'Geometric and luxurious design', '#B8860B', true),
+(uuid_generate_v4(), 'Nature', 'style', 'Nature-inspired organic design', '#228B22', true),
+(uuid_generate_v4(), 'Geometric', 'style', 'Angular and structured design', '#708090', true),
+
+-- Material tags
+(uuid_generate_v4(), 'Gold', 'material', '14k and 18k gold jewelry', '#FFD700', true),
+(uuid_generate_v4(), 'Silver', 'material', 'Sterling silver jewelry', '#C0C0C0', true),
+(uuid_generate_v4(), 'Platinum', 'material', 'Platinum jewelry', '#E5E4E2', true),
+(uuid_generate_v4(), 'Diamond', 'material', 'Diamond-set jewelry', '#B9F2FF', true),
+(uuid_generate_v4(), 'Pearl', 'material', 'Pearl jewelry', '#F8F8FF', true),
+(uuid_generate_v4(), 'Gemstone', 'material', 'Colored gemstone jewelry', '#9370DB', true),
+(uuid_generate_v4(), 'Rose Gold', 'material', 'Rose gold jewelry', '#E8B4B8', true),
+(uuid_generate_v4(), 'Titanium', 'material', 'Titanium jewelry', '#878681', true),
+
+-- Occasion tags
+(uuid_generate_v4(), 'Wedding', 'occasion', 'Wedding ceremonies and celebrations', '#FFFFFF', true),
+(uuid_generate_v4(), 'Engagement', 'occasion', 'Engagement and proposals', '#FFB6C1', true),
+(uuid_generate_v4(), 'Anniversary', 'occasion', 'Anniversary celebrations', '#FF1493', true),
+(uuid_generate_v4(), 'Birthday', 'occasion', 'Birthday celebrations', '#FF6347', true),
+(uuid_generate_v4(), 'Graduation', 'occasion', 'Graduation ceremonies', '#4169E1', true),
+(uuid_generate_v4(), 'Holiday', 'occasion', 'Holiday celebrations', '#228B22', true),
+(uuid_generate_v4(), 'Everyday', 'occasion', 'Daily wear jewelry', '#696969', true),
+(uuid_generate_v4(), 'Special Event', 'occasion', 'Special occasions and events', '#9932CC', true)
+ON CONFLICT DO NOTHING;
+
+-- System translations (UI elements)
+INSERT INTO system_translations (key, language_id, value, category) VALUES
+-- Navigation
+('nav.home', 'he', 'בית', 'navigation'),
+('nav.home', 'en', 'Home', 'navigation'),
+('nav.stories', 'he', 'סיפורים', 'navigation'),
+('nav.stories', 'en', 'Stories', 'navigation'),
+('nav.jewelers', 'he', 'צורפים', 'navigation'),
+('nav.jewelers', 'en', 'Jewelers', 'navigation'),
+('nav.products', 'he', 'מוצרים', 'navigation'),
+('nav.products', 'en', 'Products', 'navigation'),
+('nav.gifts', 'he', 'מתנות', 'navigation'),
+('nav.gifts', 'en', 'Gifts', 'navigation'),
+
+-- Buttons
+('btn.create', 'he', 'צור', 'buttons'),
+('btn.create', 'en', 'Create', 'buttons'),
+('btn.save', 'he', 'שמור', 'buttons'),
+('btn.save', 'en', 'Save', 'buttons'),
+('btn.cancel', 'he', 'בטל', 'buttons'),
+('btn.cancel', 'en', 'Cancel', 'buttons'),
+('btn.submit', 'he', 'שלח', 'buttons'),
+('btn.submit', 'en', 'Submit', 'buttons'),
+('btn.search', 'he', 'חפש', 'buttons'),
+('btn.search', 'en', 'Search', 'buttons'),
+
+-- Status labels
+('status.pending', 'he', 'ממתין', 'status'),
+('status.pending', 'en', 'Pending', 'status'),
+('status.active', 'he', 'פעיל', 'status'),
+('status.active', 'en', 'Active', 'status'),
+('status.completed', 'he', 'הושלם', 'status'),
+('status.completed', 'en', 'Completed', 'status'),
+('status.cancelled', 'he', 'בוטל', 'status'),
+('status.cancelled', 'en', 'Cancelled', 'status')
+ON CONFLICT (key, language_id) DO UPDATE SET
+    value = EXCLUDED.value,
+    category = EXCLUDED.category;
+
+-- Enum translations
+INSERT INTO enum_translations (enum_name, enum_value, language_id, translation) VALUES
+-- Budget ranges
+('budget_range', 'under_500', 'he', 'מתחת ל-500 ₪'),
+('budget_range', 'under_500', 'en', 'Under ₪500'),
+('budget_range', '500_1000', 'he', '500-1,000 ₪'),
+('budget_range', '500_1000', 'en', '₪500-1,000'),
+('budget_range', '1000_2500', 'he', '1,000-2,500 ₪'),
+('budget_range', '1000_2500', 'en', '₪1,000-2,500'),
+('budget_range', '2500_5000', 'he', '2,500-5,000 ₪'),
+('budget_range', '2500_5000', 'en', '₪2,500-5,000'),
+('budget_range', '5000_10000', 'he', '5,000-10,000 ₪'),
+('budget_range', '5000_10000', 'en', '₪5,000-10,000'),
+('budget_range', 'over_10000', 'he', 'מעל 10,000 ₪'),
+('budget_range', 'over_10000', 'en', 'Over ₪10,000'),
+
+-- Timeline options
+('timeline', 'urgent', 'he', 'דחוף'),
+('timeline', 'urgent', 'en', 'Urgent'),
+('timeline', '1_week', 'he', 'שבוע'),
+('timeline', '1_week', 'en', '1 Week'),
+('timeline', '2_weeks', 'he', 'שבועיים'),
+('timeline', '2_weeks', 'en', '2 Weeks'),
+('timeline', '1_month', 'he', 'חודש'),
+('timeline', '1_month', 'en', '1 Month'),
+('timeline', '2_months', 'he', 'חודשיים'),
+('timeline', '2_months', 'en', '2 Months'),
+('timeline', 'flexible', 'he', 'גמיש'),
+('timeline', 'flexible', 'en', 'Flexible'),
+
+-- Order status
+('order_status', 'pending', 'he', 'ממתין'),
+('order_status', 'pending', 'en', 'Pending'),
+('order_status', 'confirmed', 'he', 'אושר'),
+('order_status', 'confirmed', 'en', 'Confirmed'),
+('order_status', 'in_production', 'he', 'בייצור'),
+('order_status', 'in_production', 'en', 'In Production'),
+('order_status', 'ready', 'he', 'מוכן'),
+('order_status', 'ready', 'en', 'Ready'),
+('order_status', 'shipped', 'he', 'נשלח'),
+('order_status', 'shipped', 'en', 'Shipped'),
+('order_status', 'delivered', 'he', 'נמסר'),
+('order_status', 'delivered', 'en', 'Delivered'),
+('order_status', 'cancelled', 'he', 'בוטל'),
+('order_status', 'cancelled', 'en', 'Cancelled')
+ON CONFLICT (enum_name, enum_value, language_id) DO UPDATE SET
+    translation = EXCLUDED.translation;
+
+-- ============================================================================
+-- DEMO DATA (For development and demonstration)
+-- ============================================================================
+
+-- Demo users
+INSERT INTO users (id, email, name, role, preferred_language, phone, marketing_consent, created_at) VALUES
+(uuid_generate_v4(), 'demo.customer@gemsai.com', 'Sarah Cohen', 'customer', 'he', '+972501234567', true, NOW() - INTERVAL '30 days'),
+(uuid_generate_v4(), 'demo.jeweler@gemsai.com', 'David Goldstein', 'jeweler', 'he', '+972507654321', true, NOW() - INTERVAL '25 days'),
+(uuid_generate_v4(), 'demo.admin@gemsai.com', 'Admin User', 'admin', 'en', '+972509876543', false, NOW() - INTERVAL '60 days'),
+(uuid_generate_v4(), 'maya.levi@gemsai.com', 'Maya Levi', 'customer', 'he', '+972502345678', true, NOW() - INTERVAL '20 days'),
+(uuid_generate_v4(), 'jeweler.premium@gemsai.com', 'Premium Jewelers Ltd', 'jeweler', 'en', '+972503456789', true, NOW() - INTERVAL '45 days')
+ON CONFLICT (email) DO NOTHING;
+
+-- Demo jewelers (using the jeweler users created above)
+DO $$
+DECLARE
+    jeweler_user_id UUID;
+    premium_user_id UUID;
+    jeweler_id UUID;
+    premium_id UUID;
+BEGIN
+    -- Get jeweler user IDs
+    SELECT id INTO jeweler_user_id FROM users WHERE email = 'demo.jeweler@gemsai.com';
+    SELECT id INTO premium_user_id FROM users WHERE email = 'jeweler.premium@gemsai.com';
+    
+    IF jeweler_user_id IS NOT NULL THEN
+        INSERT INTO jewelers (id, user_id, business_name, verification_status, rating, total_orders, response_time_hours, location_city, location_country, specialties, years_experience, portfolio_url, business_license, created_at)
+        VALUES (uuid_generate_v4(), jeweler_user_id, 'Goldstein Fine Jewelry', 'verified', 4.8, 156, 2, 'Tel Aviv', 'Israel', ARRAY['rings', 'necklaces', 'custom'], 15, 'https://goldstein-jewelry.example.com', 'IL-BL-123456', NOW() - INTERVAL '25 days')
+        RETURNING id INTO jeweler_id;
+    END IF;
+    
+    IF premium_user_id IS NOT NULL THEN
+        INSERT INTO jewelers (id, user_id, business_name, verification_status, rating, total_orders, response_time_hours, location_city, location_country, specialties, years_experience, portfolio_url, business_license, created_at)
+        VALUES (uuid_generate_v4(), premium_user_id, 'Premium Jewelers Ltd', 'verified', 4.9, 89, 1, 'Jerusalem', 'Israel', ARRAY['diamonds', 'luxury', 'custom'], 25, 'https://premium-jewelers.example.com', 'IL-BL-789012', NOW() - INTERVAL '45 days')
+        RETURNING id INTO premium_id;
+    END IF;
+END $$;
+
+-- Demo jeweler translations
+DO $$
+DECLARE
+    jeweler_id UUID;
+    premium_id UUID;
+BEGIN
+    SELECT j.id INTO jeweler_id FROM jewelers j JOIN users u ON j.user_id = u.id WHERE u.email = 'demo.jeweler@gemsai.com';
+    SELECT j.id INTO premium_id FROM jewelers j JOIN users u ON j.user_id = u.id WHERE u.email = 'jeweler.premium@gemsai.com';
+    
+    IF jeweler_id IS NOT NULL THEN
+        INSERT INTO jeweler_translations (id, jeweler_id, language_id, name, bio, tagline) VALUES
+        (uuid_generate_v4(), jeweler_id, 'he', 'תכשיטי גולדשטיין', 'צורף מומחה עם 15 שנות ניסיון ביצירת תכשיטים מותאמים אישית. מתמחה בטבעות נישואין וטבעות אירוסין יוקרתיות.', 'יוצרים זיכרונות לנצח'),
+        (uuid_generate_v4(), jeweler_id, 'en', 'Goldstein Fine Jewelry', 'Expert jeweler with 15 years of experience creating custom jewelry pieces. Specializing in luxury wedding and engagement rings.', 'Creating memories that last forever');
+        
+        INSERT INTO jeweler_translations (id, jeweler_id, language_id, name, bio, tagline) VALUES
+        (uuid_generate_v4(), premium_id, 'he', 'צורפים פרמיום בע"מ', 'בית צורפות יוקרתי המתמחה ביהלומים ותכשיטים מותאמים אישית. 25 שנות מצוינות בשירות ובאיכות.', 'מצוינות ללא פשרות'),
+        (uuid_generate_v4(), premium_id, 'en', 'Premium Jewelers Ltd', 'Luxury jewelry house specializing in diamonds and custom pieces. 25 years of excellence in service and quality.', 'Excellence without compromise');
+    END IF;
+END $$;
+
+-- Demo products
+DO $$
+DECLARE
+    jeweler_id UUID;
+    premium_id UUID;
+    product_id UUID;
+    category_rings UUID;
+    category_necklaces UUID;
+    tag_love UUID;
+    tag_elegant UUID;
+    tag_gold UUID;
+    tag_diamond UUID;
+BEGIN
+    -- Get IDs
+    SELECT j.id INTO jeweler_id FROM jewelers j JOIN users u ON j.user_id = u.id WHERE u.email = 'demo.jeweler@gemsai.com';
+    SELECT j.id INTO premium_id FROM jewelers j JOIN users u ON j.user_id = u.id WHERE u.email = 'jeweler.premium@gemsai.com';
+    SELECT id INTO category_rings FROM categories WHERE name = 'Rings' LIMIT 1;
+    SELECT id INTO category_necklaces FROM categories WHERE name = 'Necklaces' LIMIT 1;
+    SELECT id INTO tag_love FROM tags WHERE name = 'Love' LIMIT 1;
+    SELECT id INTO tag_elegant FROM tags WHERE name = 'Elegance' LIMIT 1;
+    SELECT id INTO tag_gold FROM tags WHERE name = 'Gold' LIMIT 1;
+    SELECT id INTO tag_diamond FROM tags WHERE name = 'Diamond' LIMIT 1;
+    
+    IF jeweler_id IS NOT NULL THEN
+        -- Product 1: Classic engagement ring
+        INSERT INTO products (id, jeweler_id, sku, price, currency, category, materials, emotion_tags, style_tags, featured, is_available, lead_time_days, inventory_count, images, created_at)
+        VALUES (uuid_generate_v4(), jeweler_id, 'GFJ-ER-001', 3500.00, 'ILS', 'rings', ARRAY['gold', 'diamond'], ARRAY['love'], ARRAY['classic'], true, true, 21, 5, ARRAY['https://example.com/ring1.jpg'], NOW() - INTERVAL '20 days')
+        RETURNING id INTO product_id;
+        
+        -- Product translations
+        INSERT INTO product_translations (id, product_id, language_id, name, description, short_description) VALUES
+        (uuid_generate_v4(), product_id, 'he', 'טבעת אירוסין קלאסית', 'טבעת אירוסין מזהב לבן 18 קראט עם יהלום מרכזי 0.5 קראט. עיצוב קלאסי ונצחי המושלם לרגע המיוחד.', 'טבעת אירוסין זהב לבן עם יהלום 0.5 קראט'),
+        (uuid_generate_v4(), product_id, 'en', 'Classic Engagement Ring', '18k white gold engagement ring with 0.5 carat center diamond. Classic and timeless design perfect for your special moment.', '18k white gold ring with 0.5ct diamond');
+        
+        -- Product categories and tags
+        INSERT INTO product_categories (id, product_id, category_id) VALUES (uuid_generate_v4(), product_id, category_rings);
+        INSERT INTO product_tags (id, product_id, tag_id) VALUES 
+        (uuid_generate_v4(), product_id, tag_love),
+        (uuid_generate_v4(), product_id, tag_gold),
+        (uuid_generate_v4(), product_id, tag_diamond);
+    END IF;
+    
+    IF premium_id IS NOT NULL THEN
+        -- Product 2: Luxury necklace
+        INSERT INTO products (id, jeweler_id, sku, price, currency, category, materials, emotion_tags, style_tags, featured, is_available, lead_time_days, inventory_count, images, created_at)
+        VALUES (uuid_generate_v4(), premium_id, 'PJ-NK-001', 8500.00, 'ILS', 'necklaces', ARRAY['gold', 'diamond'], ARRAY['elegance'], ARRAY['modern'], true, true, 28, 2, ARRAY['https://example.com/necklace1.jpg'], NOW() - INTERVAL '15 days')
+        RETURNING id INTO product_id;
+        
+        -- Product translations
+        INSERT INTO product_translations (id, product_id, language_id, name, description, short_description) VALUES
+        (uuid_generate_v4(), product_id, 'he', 'שרשרת יהלומים יוקרתית', 'שרשרת מזהב צהוב 18 קראט משובצת יהלומים. עיצוב מודרני ואלגנטי המתאים לכל אירוע מיוחד.', 'שרשרת זהב צהוב משובצת יהלומים'),
+        (uuid_generate_v4(), product_id, 'en', 'Luxury Diamond Necklace', '18k yellow gold necklace set with diamonds. Modern and elegant design suitable for any special occasion.', '18k yellow gold diamond necklace');
+        
+        -- Product categories and tags
+        INSERT INTO product_categories (id, product_id, category_id) VALUES (uuid_generate_v4(), product_id, category_necklaces);
+        INSERT INTO product_tags (id, product_id, tag_id) VALUES 
+        (uuid_generate_v4(), product_id, tag_elegant),
+        (uuid_generate_v4(), product_id, tag_gold),
+        (uuid_generate_v4(), product_id, tag_diamond);
+    END IF;
+END $$;
+
+-- Demo stories
+DO $$
+DECLARE
+    customer_id UUID;
+    maya_id UUID;
+    story_id UUID;
+BEGIN
+    SELECT id INTO customer_id FROM users WHERE email = 'demo.customer@gemsai.com';
+    SELECT id INTO maya_id FROM users WHERE email = 'maya.levi@gemsai.com';
+    
+    IF customer_id IS NOT NULL THEN
+        INSERT INTO stories (id, user_id, budget_range, timeline, status, created_at)
+        VALUES (uuid_generate_v4(), customer_id, '2500_5000', '1_month', 'active', NOW() - INTERVAL '10 days')
+        RETURNING id INTO story_id;
+        
+        -- Story translations
+        INSERT INTO story_translations (id, story_id, language_id, title, content) VALUES
+        (uuid_generate_v4(), story_id, 'he', 'הצעת נישואין בגן הבוטני', 'אני מתכנן להציע נישואין לחברה שלי במקום המיוחד שבו נפגשנו לראשונה - הגן הבוטני בירושלים. אני מחפש טבעת שתשקף את האהבה והטבע שמקיפים אותנו. משהו עדין ויפה כמוה.'),
+        (uuid_generate_v4(), story_id, 'en', 'Proposal at the Botanical Garden', 'I am planning to propose to my girlfriend at the special place where we first met - the Botanical Garden in Jerusalem. I am looking for a ring that reflects the love and nature that surrounds us. Something delicate and beautiful like her.');
+    END IF;
+    
+    IF maya_id IS NOT NULL THEN
+        INSERT INTO stories (id, user_id, budget_range, timeline, status, created_at)
+        VALUES (uuid_generate_v4(), maya_id, '1000_2500', '2_weeks', 'active', NOW() - INTERVAL '5 days')
+        RETURNING id INTO story_id;
+        
+        -- Story translations
+        INSERT INTO story_translations (id, story_id, language_id, title, content) VALUES
+        (uuid_generate_v4(), story_id, 'he', 'מתנה ליום הולדת אמא', 'אמא שלי חוגגת 60 ואני רוצה לתת לה משהו מיוחד שיראה לה כמה אני אוהבת אותה. היא תמיד אהבה תכשיטים עדינים ופשוטים. משהו שהיא תוכל ללבוש כל יום ולזכור אותי.'),
+        (uuid_generate_v4(), story_id, 'en', 'Gift for Mom\'s Birthday', 'My mom is turning 60 and I want to give her something special that shows how much I love her. She has always loved delicate and simple jewelry. Something she can wear every day and remember me.');
+    END IF;
+END $$;
+
+-- Demo user preferences
+DO $$
+DECLARE
+    customer_id UUID;
+    maya_id UUID;
+BEGIN
+    SELECT id INTO customer_id FROM users WHERE email = 'demo.customer@gemsai.com';
+    SELECT id INTO maya_id FROM users WHERE email = 'maya.levi@gemsai.com';
+    
+    IF customer_id IS NOT NULL THEN
+        INSERT INTO user_preferences (id, user_id, preferred_styles, preferred_materials, budget_range, notification_settings, privacy_settings)
+        VALUES (uuid_generate_v4(), customer_id, ARRAY['classic', 'elegant'], ARRAY['gold', 'diamond'], '2500_5000', 
+                jsonb_build_object('email', true, 'sms', false, 'push', true),
+                jsonb_build_object('profile_public', false, 'show_orders', false));
+    END IF;
+    
+    IF maya_id IS NOT NULL THEN
+        INSERT INTO user_preferences (id, user_id, preferred_styles, preferred_materials, budget_range, notification_settings, privacy_settings)
+        VALUES (uuid_generate_v4(), maya_id, ARRAY['modern', 'minimalist'], ARRAY['silver', 'gold'], '1000_2500',
+                jsonb_build_object('email', true, 'sms', true, 'push', true),
+                jsonb_build_object('profile_public', true, 'show_orders', false));
+    END IF;
+END $$;
+
+-- ============================================================================
+-- DEVELOPMENT DATA (Additional test data for development)
+-- ============================================================================
+
+-- Additional test users for development
+INSERT INTO users (id, email, name, role, preferred_language, created_at) VALUES
+(uuid_generate_v4(), 'test1@gemsai.com', 'Test User 1', 'customer', 'he', NOW() - INTERVAL '1 day'),
+(uuid_generate_v4(), 'test2@gemsai.com', 'Test User 2', 'customer', 'en', NOW() - INTERVAL '2 days'),
+(uuid_generate_v4(), 'test3@gemsai.com', 'Test User 3', 'customer', 'he', NOW() - INTERVAL '3 days'),
+(uuid_generate_v4(), 'jeweler.test@gemsai.com', 'Test Jeweler', 'jeweler', 'he', NOW() - INTERVAL '4 days')
+ON CONFLICT (email) DO NOTHING;
+
+-- Test jeweler
+DO $$
+DECLARE
+    test_jeweler_user_id UUID;
+BEGIN
+    SELECT id INTO test_jeweler_user_id FROM users WHERE email = 'jeweler.test@gemsai.com';
+    
+    IF test_jeweler_user_id IS NOT NULL THEN
+        INSERT INTO jewelers (id, user_id, business_name, verification_status, rating, total_orders, response_time_hours, location_city, location_country, specialties, years_experience)
+        VALUES (uuid_generate_v4(), test_jeweler_user_id, 'Test Jewelry Workshop', 'pending', 0.0, 0, 24, 'Haifa', 'Israel', ARRAY['custom'], 5)
+        ON CONFLICT DO NOTHING;
+    END IF;
+END $$;
+
+-- ============================================================================
+-- ANALYTICS SEED DATA
+-- ============================================================================
+
+-- Refresh materialized views with initial data
+SELECT refresh_materialized_views();
+
+-- ============================================================================
+-- VALIDATION AND LOGGING
+-- ============================================================================
+
+-- Log seed data completion
+INSERT INTO system_log (event_type, message, metadata, created_at) VALUES
+('seed_data', 'Seed data population completed successfully', 
+ jsonb_build_object(
+     'languages_count', (SELECT COUNT(*) FROM languages),
+     'categories_count', (SELECT COUNT(*) FROM categories),
+     'tags_count', (SELECT COUNT(*) FROM tags),
+     'users_count', (SELECT COUNT(*) FROM users),
+     'jewelers_count', (SELECT COUNT(*) FROM jewelers),
+     'products_count', (SELECT COUNT(*) FROM products),
+     'stories_count', (SELECT COUNT(*) FROM stories)
+ ), NOW());
+
+-- Validation queries
+DO $$
+DECLARE
+    validation_results JSONB;
+BEGIN
+    -- Validate referential integrity
+    SELECT jsonb_build_object(
+        'orphaned_jewelers', (SELECT COUNT(*) FROM jewelers j WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = j.user_id)),
+        'orphaned_products', (SELECT COUNT(*) FROM products p WHERE NOT EXISTS (SELECT 1 FROM jewelers j WHERE j.id = p.jeweler_id)),
+        'orphaned_stories', (SELECT COUNT(*) FROM stories s WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id)),
+        'missing_translations', (SELECT COUNT(*) FROM products p WHERE NOT EXISTS (SELECT 1 FROM product_translations pt WHERE pt.product_id = p.id))
+    ) INTO validation_results;
+    
+    -- Log validation results
+    INSERT INTO system_log (event_type, message, metadata, created_at) VALUES
+    ('seed_validation', 'Seed data validation completed', validation_results, NOW());
+    
+    -- Raise notice if there are issues
+    IF (validation_results->>'orphaned_jewelers')::INTEGER > 0 OR 
+       (validation_results->>'orphaned_products')::INTEGER > 0 OR 
+       (validation_results->>'orphaned_stories')::INTEGER > 0 THEN
+        RAISE NOTICE 'Warning: Found orphaned records in seed data: %', validation_results;
+    ELSE
+        RAISE NOTICE 'Seed data validation passed successfully';
+    END IF;
+END $$;
+
+-- Final success message
+DO $$
+BEGIN
+    RAISE NOTICE 'GemsAI Seed Data Population Complete!';
+    RAISE NOTICE 'Reference data, demo data, and test data have been successfully loaded.';
+    RAISE NOTICE 'Check system_log table for detailed results.';
+END $$; 
+
+================================================================================
+
+STEP 7: Verification
+
+SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;
+SELECT id, name FROM languages LIMIT 5;
+SELECT id, full_name FROM users LIMIT 5;
+

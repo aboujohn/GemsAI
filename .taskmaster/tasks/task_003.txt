@@ -1,0 +1,208 @@
+# Task ID: 3
+# Title: Implement Internationalization with Hebrew Support
+# Status: done
+# Dependencies: 1, 2
+# Priority: high
+# Description: Configure next-i18next for Hebrew-first approach with English fallback, ensuring proper RTL support throughout the application.
+# Details:
+1. Install and configure next-i18next package
+2. Set up translation files structure for Hebrew (primary) and English (fallback)
+3. Implement language detection and switching functionality
+4. Create translation keys for all UI elements
+5. Configure RTL layout switching based on language
+6. Implement number and date formatting for Hebrew locale
+7. Create a translation management system or workflow
+8. Set up font loading for Hebrew characters
+9. Implement direction-aware components that handle RTL/LTR differences
+10. Create helper hooks for translation (useTranslation wrapper)
+
+# Test Strategy:
+1. Verify correct language loading based on user preferences
+2. Test language switching functionality
+3. Validate RTL layout rendering in Hebrew mode
+4. Check for any missing translations or fallback behavior
+5. Test with native Hebrew speakers for linguistic accuracy
+6. Verify proper number and date formatting in Hebrew
+
+# Subtasks:
+## 1. Set up next-i18next configuration [done]
+### Dependencies: None
+### Description: Configure next-i18next in the Next.js application to enable internationalization support
+### Details:
+Install next-i18next package, create i18n.js configuration file, set up language namespaces, configure supported locales (including Hebrew), and integrate with Next.js config. Ensure SSR compatibility and proper loading of translation files.
+
+## 2. Implement translation management system [done]
+### Dependencies: 3.1
+### Description: Create a structured system for managing translations across multiple languages
+### Details:
+Set up translation files for each supported language, organize translations by namespaces/categories, implement a translation key convention, create helper functions for translation access, and establish a workflow for adding new translation strings.
+
+## 3. Develop RTL layout switching mechanism [done]
+### Dependencies: 3.1, 3.2
+### Description: Create a system to dynamically switch between LTR and RTL layouts based on language selection
+### Details:
+Implement direction detection based on language, set up CSS/styling approach for RTL support (using dir attribute or CSS variables), create RTL-aware components, handle text alignment, and ensure proper bidirectional text rendering for mixed content.
+<info added on 2025-06-05T19:43:30.562Z>
+Successfully implemented comprehensive RTL layout switching mechanism:
+
+**Core RTL Infrastructure Created:**
+- `lib/utils/rtl.ts`: Comprehensive RTL utilities library with direction detection, spacing utilities, bidirectional text handling, CSS class generation, and transformation utilities
+- `lib/hooks/useRTL.ts`: Complete set of RTL-aware React hooks including useRTL, useRTLClasses, useDirectionalStyles, useLayoutDirection, useRTLTransitions, useFormDirection, and useBidiContent
+
+**Direction-Aware UI Components:**
+- `DirectionalContainer`: Smart container with automatic RTL/LTR switching, spacing management, and direction attributes
+- `DirectionalFlex`: Flex container with automatic direction reversal, start/end alignment, and RTL-aware justify/align properties
+- `DirectionalInput`: Input component with content direction handling, bidirectional text support, and input type-specific behavior
+
+**Enhanced CSS System:**
+- Added comprehensive RTL utilities to `app/globals.css`
+- Transform utilities (rotate, scale, translate) for RTL
+- Position utilities (left/right swapping)
+- Animation keyframes with RTL direction awareness
+- Bidirectional text utilities (isolate, embed, override)
+- Enhanced font support for Hebrew
+
+**Features Implemented:**
+- Dynamic HTML attribute updates (lang, dir) via enhanced LanguageProvider
+- Direction detection based on language (Hebrew = RTL, English = LTR)
+- Automatic CSS class generation for direction-aware styling
+- Icon rotation for directional elements (arrows, chevrons)
+- Form field direction handling with content type awareness
+- Mixed bidirectional content support with Unicode formatting
+- Smooth transitions between RTL/LTR modes
+- Logical properties support for modern CSS features
+
+**Demonstration System:**
+- Created comprehensive `RTLDemo` component showcasing all features
+- Added demo page at `/rtl-demo` for testing and validation
+- Interactive examples of all RTL components and utilities
+
+**Technical Achievements:**
+- Type-safe RTL system with TypeScript support
+- SSR-compatible implementation
+- Performance optimized with useMemo for expensive calculations
+- Accessibility-compliant with proper ARIA attributes
+- Modern CSS logical properties where supported
+
+The RTL layout switching mechanism is production-ready and provides a complete solution for Hebrew/English bidirectional interface support.
+</info added on 2025-06-05T19:43:30.562Z>
+
+## 4. Implement language-specific formatting [done]
+### Dependencies: 3.1
+### Description: Add support for locale-specific date, number, and currency formatting
+### Details:
+Create utility functions for formatting dates, numbers, and currencies according to locale conventions, implement plural rules handling, set up locale-specific validation rules, and ensure proper sorting of localized content.
+<info added on 2025-06-05T19:52:40.197Z>
+We've successfully implemented comprehensive language-specific formatting utilities for our internationalization system. The implementation includes:
+
+1. Core formatting infrastructure:
+   - Created `lib/utils/formatting.ts` with specialized formatter classes
+   - Developed `lib/hooks/useFormatting.ts` with React hooks for all formatting needs
+
+2. Implemented formatting features:
+   - Date/Time: Multiple styles, relative formatting, Hebrew calendar support
+   - Numbers/Currency: Locale-specific formatting, multi-currency support (ILS, USD, EUR)
+   - Pluralization: Advanced rules with Hebrew-specific dual forms
+   - List Formatting: Conjunction/disjunction with locale-appropriate separators
+   - Validation: Region-specific validation (Israeli/US phone formats, postal codes)
+   - Sorting: Locale-aware with mixed Hebrew/English content prioritization
+
+3. Built demonstration system:
+   - Created `components/ui/FormattingDemo.tsx` component
+   - Added `/formatting-demo` page to showcase all formatting features
+   - Enhanced translation files with formatting-specific keys
+
+4. Technical highlights:
+   - Type-safe implementation with full TypeScript support
+   - Performance optimized with React hooks using useMemo
+   - SSR compatibility with Next.js
+   - Comprehensive locale configurations for he-IL and en-US
+   - Hebrew specializations including calendar support and pluralization rules
+
+The system integrates seamlessly with our existing LanguageProvider, RTL utilities, and translation system, providing production-ready locale support for both Hebrew and English.
+</info added on 2025-06-05T19:52:40.197Z>
+
+## 5. Design database schema for internationalization [done]
+### Dependencies: None
+### Description: Create database entities and relationships to support multilingual content
+### Details:
+Design schema for storing translations (considering approaches like separate translation tables, JSON columns, or content duplication), plan for language metadata storage, ensure proper indexing for language-specific queries, and document the schema design decisions.
+<info added on 2025-06-06T06:19:10.887Z>
+✅ **COMPLETED as part of Task 6 database deployment**
+
+The database schema for internationalization has been fully implemented with comprehensive multilingual support:
+
+**Translation System Design:**
+- `languages` table: Supports Hebrew (RTL), English (LTR), Arabic, French, Spanish
+- `system_translations` table: UI elements, navigation, buttons, status labels
+- `enum_translations` table: Budget ranges, timelines, order statuses
+- `product_translations` table: Product names, descriptions in multiple languages
+- `story_translations` table: User story content with language metadata
+- `jeweler_translations` table: Business profiles in Hebrew/English
+
+**Schema Features:**
+- Language metadata with RTL/LTR direction support
+- Fallback language system (English as fallback for Hebrew)
+- Translation publication status for content management
+- Proper indexing for language-specific queries
+- Translation versioning and audit trail
+
+**Database Implementation:**
+- Complete foreign key relationships linking content to translations
+- Indexes optimized for language-specific searches
+- Row Level Security policies for translation access
+- Material views for popular content by language
+- Full-text search supporting Hebrew and English
+
+The internationalization database schema is production-ready and deployed to Supabase.
+</info added on 2025-06-06T06:19:10.887Z>
+
+## 6. Implement ORM relationships and query optimization [done]
+### Dependencies: 3.5
+### Description: Set up ORM mappings and optimize database queries for multilingual content
+### Details:
+Configure ORM entity relationships for translations, implement efficient query patterns for retrieving localized content, create migration scripts, develop seeding mechanism for multiple languages, and implement caching strategies for translation data.
+<info added on 2025-06-06T06:19:28.489Z>
+✅ **COMPLETED as part of Task 6 database deployment**
+
+The ORM relationships and query optimization for multilingual content have been fully implemented:
+
+**ORM Entity Relationships:**
+- All translation tables properly linked via foreign keys to their parent content
+- Cascade behaviors configured (DELETE CASCADE for dependent translations)
+- Polymorphic relationships for shared content types
+- Junction tables for many-to-many translation relationships
+
+**Query Optimization Implementation:**
+- **Composite Indexes**: Language + content_id for fast translation lookups
+- **Partial Indexes**: Only active/published translations for production queries
+- **Full-text Search**: Hebrew and English search with proper language detection
+- **Expression Indexes**: JSON extraction for translation metadata queries
+- **Materialized Views**: Pre-computed popular content by language
+
+**Migration Scripts:**
+- Complete migration files (001-009) with proper sequencing
+- Rollback procedures for safe deployment
+- Data integrity validation at each step
+- Environment-specific migration strategies
+
+**Seeding System:**
+- Multi-language seed data with Hebrew/English translations
+- Reference data (categories, tags) with full translation coverage
+- Demo content in both languages for development/testing
+- Proper foreign key relationships maintained
+
+**Caching Strategies:**
+- Materialized views for analytics with auto-refresh
+- Query optimization for common translation patterns
+- Index usage monitoring and performance tracking
+
+**Production Features:**
+- Connection pooling optimized for translation queries
+- Error handling for missing translations with fallback logic
+- Performance monitoring and slow query detection
+- Automated cleanup of orphaned translation records
+
+The ORM and query system is production-ready and deployed to Supabase with comprehensive multilingual support.
+</info added on 2025-06-06T06:19:28.489Z>
+

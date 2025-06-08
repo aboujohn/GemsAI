@@ -1,0 +1,47 @@
+# Application
+NODE_ENV=development
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+
+# AI Services
+OPENAI_API_KEY=your-openai-api-key
+ELEVENLABS_API_KEY=your-elevenlabs-api-key
+
+# AWS S3 and CloudFront
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+AWS_S3_BUCKET_NAME=your-s3-bucket-name
+AWS_CLOUDFRONT_DOMAIN=your-cloudfront-domain
+AWS_REGION=us-east-1
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=your-redis-password
+
+# Payment Processors
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
+STRIPE_SECRET_KEY=your-stripe-secret-key
+STRIPE_WEBHOOK_SECRET=your-stripe-webhook-secret
+
+NEXT_PUBLIC_PAYPLUS_MERCHANT_ID=your-payplus-merchant-id
+PAYPLUS_API_KEY=your-payplus-api-key
+PAYPLUS_SECRET_KEY=your-payplus-secret-key
+PAYPLUS_WEBHOOK_SECRET=your-payplus-webhook-secret
+
+# Email Service
+EMAIL_SERVER=smtp://username:password@smtp.example.com:587
+EMAIL_FROM=noreply@yourdomain.com
+
+# Analytics and Monitoring
+NEXT_PUBLIC_POSTHOG_KEY=your-posthog-key
+NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
+SLACK_WEBHOOK_URL=your-slack-webhook-url
+
+# Feature Flags
+ENABLE_SOCIAL_LOGIN=false
+ENABLE_CUSTOM_JEWELRY=false 

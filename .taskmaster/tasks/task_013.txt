@@ -1,0 +1,59 @@
+# Task ID: 13
+# Title: Implement AI Sketch Generation System
+# Status: pending
+# Dependencies: 8, 11, 12
+# Priority: high
+# Description: Create the backend service and queue worker for generating AI sketches from user stories and emotion tags using DALL·E/SDXL.
+# Details:
+1. Implement prompt construction from story and emotion tags
+2. Create OpenAI DALL·E integration for sketch generation
+3. Implement SDXL as fallback or alternative
+4. Create sketch generation queue worker using BullMQ
+5. Implement retry logic for failed generations
+6. Create sketch storage in S3 with appropriate metadata
+7. Implement sketch variant generation (3-5 styles)
+8. Create prompt templates for different sketch styles
+9. Implement sketch generation status tracking
+10. Create admin monitoring for generation queue
+11. Implement rate limiting and cost control measures
+
+# Test Strategy:
+1. Test prompt construction with various stories
+2. Verify sketch generation with DALL-E and SDXL
+3. Test queue worker processing
+4. Validate retry logic for failed generations
+5. Test S3 storage of generated sketches
+6. Verify variant generation produces distinct styles
+7. Test monitoring and status tracking
+
+# Subtasks:
+## 1. Implement Prompt Construction Service [pending]
+### Dependencies: None
+### Description: Create a service that constructs AI generation prompts from user stories and emotion tags
+### Details:
+Develop a PromptConstructionService class that takes user story text and emotion tags as input and generates optimized prompts for AI image generation. Implement different prompt templates for various sketch styles (realistic, cartoon, abstract, etc.). Include emotion-specific modifiers and style-specific instructions in the prompts. Store prompt templates in a configuration file for easy updates.
+
+## 2. Implement OpenAI DALL-E Integration with SDXL Fallback [pending]
+### Dependencies: 13.1
+### Description: Create a service that integrates with OpenAI DALL-E API and implements SDXL as a fallback option
+### Details:
+Develop an ImageGenerationService that accepts prompts from the PromptConstructionService. Implement primary integration with DALL-E API using the OpenAI SDK. Create a fallback mechanism to SDXL when DALL-E fails or is unavailable. Implement a common interface for both providers to standardize the response format. Configure API keys and endpoints through environment variables. Include proper error handling and logging for API failures.
+
+## 3. Implement Sketch Generation Queue with BullMQ [pending]
+### Dependencies: 13.2
+### Description: Create a queue system for processing sketch generation requests asynchronously
+### Details:
+Set up BullMQ with Redis for queue management. Create a SketchGenerationQueue class that handles job creation, processing, and completion. Implement job prioritization based on user tier or request type. Configure concurrency limits to prevent API rate limit issues. Implement job timeout handling and automatic retries with exponential backoff for failed generations. Create queue event listeners for monitoring and logging.
+
+## 4. Implement S3 Storage and Metadata Management [pending]
+### Dependencies: 13.3
+### Description: Create a system for storing generated sketches in S3 with appropriate metadata
+### Details:
+Develop a SketchStorageService that uploads generated images to S3. Implement a consistent naming convention for S3 objects. Create a metadata structure that includes generation parameters, prompt used, user ID, timestamp, and generation model. Store metadata both in S3 object tags and in a database for efficient querying. Implement variant grouping to associate multiple style variants of the same sketch. Configure appropriate S3 bucket policies and CORS settings.
+
+## 5. Implement Status Tracking and Admin Monitoring [pending]
+### Dependencies: 13.3, 13.4
+### Description: Create a system for tracking generation status and admin monitoring of the queue
+### Details:
+Develop a SketchStatusService that tracks the status of sketch generation jobs (pending, processing, completed, failed). Create a database schema for storing generation job status and history. Implement a status update mechanism that integrates with the queue events. Create admin API endpoints for monitoring queue health, job status, and system metrics. Implement rate limiting and cost control measures based on user quotas or system-wide limits. Create a dashboard for visualizing generation statistics and queue performance.
+

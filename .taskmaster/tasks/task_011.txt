@@ -1,0 +1,30 @@
+# Task ID: 11
+# Title: Set Up AWS S3 and CloudFront for Media Storage
+# Status: pending
+# Dependencies: 5
+# Priority: medium
+# Description: Configure AWS S3 buckets and CloudFront CDN for storing and serving media assets, particularly sketches and product images.
+# Details:
+1. Create AWS S3 buckets for different asset types:
+   - sketches
+   - products
+   - user-uploads
+   - gifts
+2. Configure bucket permissions and CORS settings
+3. Set up CloudFront distribution with appropriate cache settings
+4. Implement signed URL generation for secure uploads
+5. Create backend service for file upload/download
+6. Implement file type validation and size limits
+7. Set up image optimization pipeline
+8. Configure CDN caching strategies
+9. Implement media deletion policies
+10. Create backup strategy for critical assets
+
+# Test Strategy:
+1. Test file uploads to different buckets
+2. Verify CloudFront distribution serves files correctly
+3. Test signed URL generation and expiration
+4. Validate file type and size restrictions
+5. Test image optimization pipeline
+6. Verify CDN caching behavior
+7. Test file deletion functionality

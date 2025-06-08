@@ -1,0 +1,65 @@
+# Task ID: 17
+# Title: Implement Gift Creation and Sharing System
+# Status: pending
+# Dependencies: 11, 16
+# Priority: medium
+# Description: Create the functionality for users to create gift messages, select gift wrap animations, and generate shareable gift links.
+# Details:
+1. Design gift message input interface (text/voice)
+2. Implement ElevenLabs integration for Hebrew TTS
+3. Create gift wrap animation selection interface
+4. Implement framer-motion animations for gift wrapping
+5. Create gift preview functionality
+6. Implement secure share link generation
+7. Create gift viewer page for recipients
+8. Implement gift reaction collection
+9. Create notification system for gift reactions
+10. Implement gift expiration and privacy controls
+
+# Test Strategy:
+1. Test gift message input (text and voice)
+2. Verify TTS functionality with Hebrew text
+3. Test gift wrap animation selection
+4. Validate animation rendering
+5. Test gift preview functionality
+6. Verify share link generation and security
+7. Test gift viewer page
+8. Validate reaction collection and notifications
+
+# Subtasks:
+## 1. Design Gift System Database Schema [pending]
+### Dependencies: None
+### Description: Create the database schema for the gift system including tables for gifts, animations, messages, and user relationships.
+### Details:
+Design tables for: gifts (id, sender_id, recipient_id, message, animation_id, created_at), animations (id, name, file_path, thumbnail), user_wishlists (id, user_id, item_id, priority, notes), favorites (id, user_id, gift_id, created_at). Include proper foreign key relationships and indexes for performance.
+
+## 2. Implement Gift Message Creation UI [pending]
+### Dependencies: 17.1
+### Description: Develop the user interface for creating personalized gift messages with text formatting options and character limits.
+### Details:
+Create a form component with rich text editor, character counter, emoji picker, and preview functionality. Implement validation for maximum character limits and required fields. Design should be responsive and accessible across devices.
+
+## 3. Develop Animation Selection System [pending]
+### Dependencies: 17.1
+### Description: Build the animation library and selection interface for users to choose animations for their gifts.
+### Details:
+Create an animation browser with categories, preview functionality, and search options. Implement animation rendering engine that supports various formats. Include pagination for large animation libraries and recently used section for quick access.
+
+## 4. Create Share Link Generation and Gift Viewer [pending]
+### Dependencies: 17.2, 17.3
+### Description: Implement the system to generate unique shareable links and the gift viewer page for recipients.
+### Details:
+Generate secure, unique URLs for each gift. Build gift viewer page with animation playback, message display, and social sharing options. Implement analytics to track gift views and interactions. Ensure proper loading states and error handling for broken links.
+
+## 5. Implement Wishlist and Favorites Functionality [pending]
+### Dependencies: 17.1
+### Description: Develop the wishlist and favorites features including UI components and API endpoints.
+### Details:
+Create wishlist management interface with add/edit/delete capabilities. Implement favorites system for saving received gifts. Develop API endpoints for CRUD operations on wishlists and favorites. Add sorting and filtering options for both features. Implement drag-and-drop for wishlist item prioritization.
+
+## 6. Build Notification System [pending]
+### Dependencies: 17.4, 17.5
+### Description: Create a notification system for gift receipts, wishlist updates, and other relevant events.
+### Details:
+Implement in-app notifications with read/unread status. Develop email notification templates for gift receipts and wishlist activity. Create notification preferences settings for users. Implement push notifications for mobile users. Add notification center UI with filtering and bulk actions.
+

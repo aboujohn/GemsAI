@@ -1,0 +1,30 @@
+{
+  "hero": {
+    "title": "GemsAI",
+    "subtitle": "Transform your stories into meaningful jewelry with the power of AI",
+    "createStory": "Create Your Story",
+    "viewGallery": "View Gallery"
+  },
+  "howItWorks": {
+    "title": "How It Works",
+    "subtitle": "Our AI-powered platform transforms your personal stories into beautiful, meaningful jewelry designs",
+    "shareStory": {
+      "title": "Share Your Story",
+      "description": "Tell us about a meaningful moment, memory, or emotion you'd like to capture"
+    },
+    "aiAnalysis": {
+      "title": "AI Analysis",
+      "description": "Our AI analyzes your story's emotions and themes to suggest perfect gemstones and designs"
+    },
+    "craftJewelry": {
+      "title": "Craft Your Jewelry",
+      "description": "Receive your custom jewelry design, crafted with meaning and personal significance"
+    }
+  },
+  "cta": {
+    "title": "Ready to Create Something Beautiful?",
+    "subtitle": "Start your journey from story to jewelry today",
+    "startCreating": "Start Creating",
+    "learnMore": "Learn More"
+  }
+}

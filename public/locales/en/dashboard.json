@@ -1,0 +1,39 @@
+{
+  "navigation": {
+    "overview": "Overview",
+    "stories": "My Stories",
+    "orders": "Orders",
+    "settings": "Settings",
+    "profile": "Profile"
+  },
+  "overview": {
+    "title": "Overview",
+    "welcomeBack": "Welcome back, {{name}}",
+    "quickStats": {
+      "totalStories": "Total Stories",
+      "activeOrders": "Active Orders",
+      "completedJewelry": "Completed Jewelry"
+    }
+  },
+  "stories": {
+    "title": "My Stories",
+    "createNew": "Create New Story",
+    "empty": "You haven't created any stories yet",
+    "status": {
+      "draft": "Draft",
+      "analyzing": "Analyzing",
+      "ready": "Ready for Production"
+    }
+  },
+  "orders": {
+    "title": "My Orders",
+    "empty": "No active orders",
+    "status": {
+      "pending": "Pending Approval",
+      "approved": "Approved",
+      "manufacturing": "Manufacturing",
+      "shipping": "Shipping",
+      "delivered": "Delivered"
+    }
+  }
+}

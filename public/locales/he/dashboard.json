@@ -1,0 +1,39 @@
+{
+  "navigation": {
+    "overview": "סקירה כללית",
+    "stories": "הסיפורים שלי",
+    "orders": "הזמנות",
+    "settings": "הגדרות",
+    "profile": "פרופיל"
+  },
+  "overview": {
+    "title": "סקירה כללית",
+    "welcomeBack": "ברוך הבא, {{name}}",
+    "quickStats": {
+      "totalStories": "סה\"כ סיפורים",
+      "activeOrders": "הזמנות פעילות",
+      "completedJewelry": "תכשיטים שהושלמו"
+    }
+  },
+  "stories": {
+    "title": "הסיפורים שלי",
+    "createNew": "צור סיפור חדש",
+    "empty": "עדיין לא יצרת סיפורים",
+    "status": {
+      "draft": "טיוטה",
+      "analyzing": "מנתח",
+      "ready": "מוכן לייצור"
+    }
+  },
+  "orders": {
+    "title": "ההזמנות שלי",
+    "empty": "אין הזמנות פעילות",
+    "status": {
+      "pending": "ממתין לאישור",
+      "approved": "אושר",
+      "manufacturing": "בייצור",
+      "shipping": "נשלח",
+      "delivered": "נמסר"
+    }
+  }
+}

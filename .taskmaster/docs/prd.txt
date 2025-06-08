@@ -1,0 +1,145 @@
+# GemsAI Product Requirements Document
+
+## Project Overview
+GemsAI is an emotionally intelligent jewelry platform that connects emotion, personal storytelling, and technology. The platform enables users to purchase personalized jewelry through a voice-based AI assistant or free browsing. It transforms user stories into AI-generated sketches, which are then matched with jewelry products or used to create custom pieces.
+
+## Target Audience
+### End Users (Buyers/Creators)
+- **The Romantic Giver** – Emotional gift-giver focused on meaningful milestones
+- **The Self-Expressive Buyer** – Interested in jewelry as self-expression
+- **The Gift Explorer** – Uncertain shoppers needing emotional guidance
+
+### Jeweler Partners (Supply Side)
+- **The Boutique Artisan** – Seeks exposure with no tech friction
+- **The Custom Commission Expert** – Loves interpreting emotional briefs
+- **The Trend-Conscious Designer** – Attracted by storytelling differentiation
+
+## Core Requirements
+
+### Technology Stack
+#### Frontend
+- Next.js (App Router) with SSR and modular routing
+- Tailwind CSS (responsive, utility-first) with RTL support
+- shadcn/ui + lucide (accessible, flexible)
+- react-hook-form (lightweight, TypeScript-friendly)
+- React Hooks (Context) with potential upgrade to Zustand
+- framer-motion for gift wrap and transitions
+- SWR or React Query via sdk/ directory
+
+#### Backend
+- NestJS for structured API development
+- Supabase for authentication and database
+- AWS S3 with CloudFront CDN for media storage
+- Redis for caching and queue management
+- BullMQ for job processing
+
+#### AI Services
+- GPT-4o (OpenAI) for story processing, emotion detection, and assistant conversation
+- ElevenLabs for Text-to-Speech (TTS) with emotional Hebrew voice output
+- DALL·E / SDXL for sketch generation
+
+#### Payment Processing
+- PayPlus (local Israeli payment processor)
+- Stripe integration
+
+## MVP Features
+
+### 1. Emotion-Driven Story Capture
+- Voice/Text Story Entry – Toggle input types, real-time transcription, RTL support
+- Emotion Detection & Tagging – Analyze story for emotional tones, editable tags
+- Persona-Guided Assistant Flow – Warm, guided assistant with persona templates
+- Story Preview & Confirmation – Full preview, edit options, confirm gate
+
+### 2. AI Sketch Generation
+- Prompt Construction – Transform story + tags into visual prompt
+- Sketch API Worker – Queue sketch tasks reliably with retries
+- Sketch Viewer UI – View sketch and emotional context
+- Sketch Variants – Multiple sketch styles (3-5 unique variants)
+- Admin Monitoring – Monitor queue health and outcomes
+
+### 3. Proposal Matching & Product Flow
+- Product Match Engine – Match sketches to emotionally relevant jewelry
+- Proposal Preview – Preview proposals generated from sketch
+- Emotion-Tagged Browsing – Browse jewelry by emotional themes
+- Feedback on Sketch – Rate and comment on sketch
+
+### 4. Gift Creation & Sharing
+- Gift Message Input – Record or write gift message
+- Gift Wrap Animation – Choose and preview gift animation themes
+- Gift Preview & Share Link – Preview and generate shareable link
+- Gift Viewer & Reactions – View and react to gift
+
+### 5. Jeweler Tools
+- Upload Form – Upload products with tags/media
+- Submit Proposals – Respond to sketches with proposals
+- Dashboard View – Track proposals and uploads
+- Sketch Rework Feedback – Request revisions on sketches
+
+### 6. Checkout & Payments
+- Checkout UI – Securely complete purchase
+- Payment Webhook – Update order status from payment processor
+- Purchase Confirmation – Receipt and confirmation
+- Failure Recovery – Retry failed payments easily
+
+### 7. Admin & Analytics
+- Metrics Dashboard – View key usage stats
+- Slack Alerts – Alert failures via Slack
+- Log Viewer – Search logs by session or endpoint
+- A/B Test Tracker – Compare prompt and flow performance
+
+## Implementation Details
+
+### Project Structure
+1. Initialize Next.js App Router project with TypeScript
+2. Set up Tailwind CSS with RTL support and shadcn/ui components
+3. Configure next-i18next for Hebrew-first approach with English fallback
+4. Scaffold NestJS backend structure with modular services
+5. Configure Supabase connection with appropriate schema design
+6. Set up AWS services (S3 with CloudFront CDN)
+7. Implement Redis and BullMQ for caching and job processing
+8. Configure CI/CD pipeline with GitHub Actions
+
+### Database Schema
+- Users Table (user profiles, auth)
+- Stories Table (with emotion_tags[] array)
+- Sketches Table (with foreign key to story_id)
+- Products Table (with style_tags[] array)
+- Jewelers Table (profiles, dashboards)
+- Gifts Table (messages, share tokens)
+- Orders Table (payment status, tracking)
+
+### Performance Requirements
+- Voice/text input response: <1s latency
+- Sketch generation: ≤2 minutes
+- System uptime: ≥99.9%
+- Mobile-first, responsive design
+- Accessible per WCAG standards
+- Hebrew RTL support throughout application
+
+### Security Requirements
+- JWT authentication with Supabase
+- Role-based access control (user, jeweler, admin)
+- Secure payment processing
+- Rate limiting to prevent abuse
+- Data encryption for sensitive information
+
+## Technical Constraints
+- Hebrew/RTL support required (with fallback to English)
+- Mobile-first, fully accessible design
+- Sketch system must be fault-tolerant and scalable
+- Real-time audio must be low-latency and reliable
+
+## Future Features (Post-MVP)
+- Real-time collaboration with jewelers
+- Advanced customization tools or drawing
+- Public social features
+- Full multilingual support
+
+## Success Metrics
+- Story flow completion rate: ≥60%
+- Time to sketch delivery: ≤2 minutes
+- Gift creation rate: ≥30%
+- Proposal click-through: ≥25%
+- Jeweler profile views/session: ≥3
+- Avg. sketch rating (1-5): ≥4.0
+- Gift reactions (shared links): ≥40% 

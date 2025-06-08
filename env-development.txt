@@ -1,0 +1,17 @@
+# Application
+NODE_ENV=development
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Development Settings
+DEBUG=true
+NEXT_PUBLIC_ENABLE_MOCKS=true
+NEXT_PUBLIC_DISABLE_ANALYTICS=true
+NEXT_PUBLIC_SHOW_DEV_TOOLS=true
+
+# Development API URLs
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
+NEXT_PUBLIC_BACKEND_URL=http://localhost:3333
+
+# Feature Flags for Development
+NEXT_PUBLIC_ENABLE_EXPERIMENTAL_FEATURES=true
+NEXT_PUBLIC_ENABLE_DASHBOARD_ADMIN=true 

@@ -1,0 +1,65 @@
+# Task ID: 18
+# Title: Implement Jeweler Tools and Dashboard
+# Status: pending
+# Dependencies: 4, 6, 11
+# Priority: medium
+# Description: Create the interface and functionality for jewelers to upload products, submit proposals, and manage their inventory.
+# Details:
+1. Design jeweler dashboard with key metrics
+2. Implement product upload form with tagging
+3. Create media upload functionality for product images
+4. Implement proposal submission interface
+5. Create inventory management tools
+6. Implement order tracking for jewelers
+7. Create sketch rework request functionality
+8. Implement notification system for new sketch opportunities
+9. Create analytics for jeweler performance
+10. Implement profile and portfolio management
+
+# Test Strategy:
+1. Test jeweler dashboard rendering
+2. Verify product upload functionality
+3. Test media upload for product images
+4. Validate proposal submission
+5. Test inventory management tools
+6. Verify order tracking
+7. Test sketch rework requests
+8. Validate notification system
+
+# Subtasks:
+## 1. Design Jeweler Dashboard Interface [pending]
+### Dependencies: None
+### Description: Create a user-friendly dashboard interface specifically for jewelers to manage their products and business operations.
+### Details:
+Design wireframes and mockups for the jeweler dashboard. Include sections for inventory, orders, analytics, and product management. Ensure the UI follows brand guidelines and provides intuitive navigation. Consider responsive design for mobile access.
+
+## 2. Implement Product Upload Functionality [pending]
+### Dependencies: 18.1
+### Description: Develop features for jewelers to add, edit, and manage their product listings with detailed specifications.
+### Details:
+Create forms for product information including images, materials, dimensions, pricing, and jewelry-specific attributes. Implement validation, bulk upload capabilities, and draft saving. Include image optimization for jewelry photography.
+
+## 3. Build Inventory Management System [pending]
+### Dependencies: 18.2
+### Description: Create a comprehensive inventory tracking system for jewelers to monitor stock levels, materials, and components.
+### Details:
+Develop features for tracking raw materials, finished products, and work-in-progress items. Include alerts for low stock, material usage tracking, and integration with the product catalog. Implement batch tracking and inventory valuation reports.
+
+## 4. Develop Order Processing and Tracking [pending]
+### Dependencies: 18.3
+### Description: Implement order management capabilities for jewelers to process, fulfill, and track customer orders.
+### Details:
+Create interfaces for order receipt, processing, fulfillment, and shipping. Include status updates, customer communication tools, and integration with inventory. Develop features for custom orders and special requests common in jewelry businesses.
+
+## 5. Implement Core Analytics Engine [pending]
+### Dependencies: 18.1, 18.4
+### Description: Develop the foundation for the analytics system including data collection, storage, and processing capabilities.
+### Details:
+Set up event tracking infrastructure to capture user interactions, sales data, and inventory movements. Implement data processing pipelines, create database schemas for analytics, and establish API endpoints for data retrieval. Include real-time data processing capabilities.
+
+## 6. Create Analytics Visualization Dashboard [pending]
+### Dependencies: 18.5
+### Description: Build interactive data visualization tools for jewelers to analyze business performance, customer behavior, and inventory trends.
+### Details:
+Develop charts, graphs, and reports showing sales trends, popular products, customer demographics, and inventory turnover. Include customizable date ranges, filtering options, and exportable reports. Implement user journey visualization and funnel analysis tools.
+
