@@ -1,0 +1,19 @@
+# AWS S3 and CloudFront Configuration for GemsAI
+# Add these environment variables to your .env file
+
+# AWS S3 Configuration
+AWS_ACCESS_KEY_ID=your-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
+AWS_REGION=us-east-1
+
+# S3 Buckets (create these in your AWS account)
+AWS_S3_BUCKET_SKETCHES=gemsai-sketches-dev
+AWS_S3_BUCKET_PRODUCTS=gemsai-products-dev
+AWS_S3_BUCKET_USER_UPLOADS=gemsai-uploads-dev
+AWS_S3_BUCKET_GIFTS=gemsai-gifts-dev
+
+# CloudFront Distribution Domain (optional - improves performance)
+AWS_CLOUDFRONT_DOMAIN=d1234567890.cloudfront.net
+
+# Note: Replace the example values with your actual AWS credentials and bucket names
+# For production, use different bucket names and ensure proper security policies 

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Mail, Loader2, CheckCircle, ArrowLeft } from 'lucide-react';
 import { useAuth, useAuthForm } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';

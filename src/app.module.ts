@@ -12,6 +12,8 @@ import { GiftModule } from './gift/gift.module';
 import { OrderModule } from './order/order.module';
 import { CommonModule } from './common/common.module';
 import { FacadeModule } from './facade/facade.module';
+import { StorageModule } from './storage/storage.module';
+import { QueueModule } from './queue/queue.module';
 import { AppThrottlerModule } from './common/throttler/throttler.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
@@ -36,6 +38,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     OrderModule,
     CommonModule,
     FacadeModule,
+    StorageModule,
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Mic, MicOff, FileText, Volume2, Settings, Save, Trash2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';

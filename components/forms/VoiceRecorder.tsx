@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Mic, MicOff, Play, Pause, Square, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import {

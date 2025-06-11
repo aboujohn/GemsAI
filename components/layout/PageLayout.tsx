@@ -40,3 +40,6 @@ export default function PageLayout({
     </div>
   );
 }
+
+export default PageLayout;
+export { PageLayout };

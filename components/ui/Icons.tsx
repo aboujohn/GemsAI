@@ -17,6 +17,7 @@ import {
   Image,
   Laptop,
   Loader2,
+  Lock,
   Mail,
   Menu,
   Moon,
@@ -75,6 +76,18 @@ import {
   Info,
   CheckCircle,
   XCircle,
+  Gem,
+  ShoppingCart,
+  Gift,
+  Home,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  RefreshCw,
+  MessageSquare,
+  Share2,
+  Grid3x3,
+  Truck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -114,6 +127,7 @@ export const Icons = {
   sortAsc: SortAsc,
   sortDesc: SortDesc,
   grid: Grid,
+  grid3x3: Grid3x3,
   list: List,
 
   // Theme
@@ -127,6 +141,7 @@ export const Icons = {
   settings: Settings,
   shield: Shield,
   shieldCheck: ShieldCheck,
+  lock: Lock,
 
   // Content
   file: File,
@@ -179,6 +194,19 @@ export const Icons = {
   star: Star,
   heart: Heart,
   zap: Zap,
+  gem: Gem,
+  shoppingCart: ShoppingCart,
+  gift: Gift,
+  home: Home,
+  truck: Truck,
+
+  // Sketch Viewer specific
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
+  rotateCcw: RotateCcw,
+  refreshCw: RefreshCw,
+  messageSquare: MessageSquare,
+  share2: Share2,
 
   // Loading
   loader2: Loader2,

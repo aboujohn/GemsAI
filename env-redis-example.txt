@@ -1,0 +1,30 @@
+# Redis Configuration for GemsAI
+# Copy these variables to your .env.local file and configure as needed
+
+# Redis Settings
+REDIS_ENABLED=false
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+REDIS_TTL=3600
+
+# When ready to enable Redis:
+# 1. Install Redis on your server or use Redis Cloud
+# 2. Set REDIS_ENABLED=true
+# 3. Configure connection details above
+# 4. Restart your application
+
+# Redis Installation Commands (Ubuntu/Debian):
+# sudo apt update
+# sudo apt install redis-server
+# sudo systemctl start redis-server
+# sudo systemctl enable redis-server
+
+# Redis Cloud Alternative:
+# Sign up at https://redis.com/try-free/
+# Get connection details and update above
+
+# Test Redis Connection:
+# redis-cli ping
+# Should return "PONG" 

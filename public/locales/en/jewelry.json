@@ -1,1 +1,41 @@
-{}
+{
+  "styles": {
+    "romantic": "Romantic",
+    "vintage": "Vintage",
+    "modern": "Modern",
+    "elegant": "Elegant",
+    "playful": "Playful",
+    "bold": "Bold",
+    "delicate": "Delicate",
+    "classic": "Classic",
+    "minimalist": "Minimalist"
+  },
+  "materials": {
+    "gold": "Gold",
+    "silver": "Silver",
+    "rose-gold": "Rose Gold",
+    "platinum": "Platinum",
+    "diamonds": "Diamonds",
+    "pearls": "Pearls",
+    "gemstones": "Gemstones"
+  },
+  "categories": {
+    "rings": "Rings",
+    "necklaces": "Necklaces",
+    "earrings": "Earrings",
+    "bracelets": "Bracelets",
+    "pendants": "Pendants"
+  },
+  "emotions": {
+    "love": "Love",
+    "joy": "Joy",
+    "peace": "Peace",
+    "strength": "Strength",
+    "elegance": "Elegance",
+    "passion": "Passion",
+    "gratitude": "Gratitude",
+    "hope": "Hope",
+    "nostalgia": "Nostalgia",
+    "pride": "Pride"
+  }
+}

@@ -1,1 +1,41 @@
-{}
+{
+  "styles": {
+    "romantic": "רומנטי",
+    "vintage": "וינטג'",
+    "modern": "מודרני",
+    "elegant": "אלגנטי",
+    "playful": "שובב",
+    "bold": "נועז",
+    "delicate": "עדין",
+    "classic": "קלאסי",
+    "minimalist": "מינימליסטי"
+  },
+  "materials": {
+    "gold": "זהב",
+    "silver": "כסף",
+    "rose-gold": "זהב ורוד",
+    "platinum": "פלטינה",
+    "diamonds": "יהלומים",
+    "pearls": "פנינים",
+    "gemstones": "אבני חן"
+  },
+  "categories": {
+    "rings": "טבעות",
+    "necklaces": "שרשראות",
+    "earrings": "עגילים",
+    "bracelets": "צמידים",
+    "pendants": "תליונים"
+  },
+  "emotions": {
+    "love": "אהבה",
+    "joy": "שמחה",
+    "peace": "שלום",
+    "strength": "כוח",
+    "elegance": "אלגנטיות",
+    "passion": "תשוקה",
+    "gratitude": "הכרת תודה",
+    "hope": "תקווה",
+    "nostalgia": "נוסטלגיה",
+    "pride": "גאווה"
+  }
+}

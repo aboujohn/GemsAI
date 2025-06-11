@@ -1,1 +1,29 @@
-{}
+{
+  "required": "This field is required",
+  "email": "Please enter a valid email address",
+  "password": {
+    "minLength": "Password must be at least {{min}} characters",
+    "uppercase": "Password must contain at least one uppercase letter",
+    "lowercase": "Password must contain at least one lowercase letter",
+    "number": "Password must contain at least one number",
+    "special": "Password must contain at least one special character"
+  },
+  "name": {
+    "minLength": "Name must be at least {{min}} characters",
+    "maxLength": "Name cannot exceed {{max}} characters"
+  },
+  "story": {
+    "minLength": "Story must be at least {{min}} characters",
+    "maxLength": "Story cannot exceed {{max}} characters"
+  },
+  "phone": "Please enter a valid phone number",
+  "url": "Please enter a valid URL",
+  "numeric": "This field must be a number",
+  "positive": "This field must be a positive number",
+  "integer": "This field must be a whole number",
+  "min": "Minimum value is {{min}}",
+  "max": "Maximum value is {{max}}",
+  "match": "Fields do not match",
+  "unique": "This value is already taken",
+  "format": "Invalid format"
+}
