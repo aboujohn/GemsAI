@@ -65,11 +65,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   supabaseClient = createMockClient();
   isDemo = true;
 } else {
+  console.log('Supabase environment variables found, using real client');
   supabaseClient = createRealClient(supabaseUrl, supabaseAnonKey);
 }
 
 // Export the client
 export const supabase = supabaseClient;
+export const isDemoMode = isDemo;
 
 // Enhanced client with session management for i18n context
 export const createI18nClient = (languageId: string = 'he') => {
@@ -127,7 +129,10 @@ export class SupabaseError extends Error {
   public readonly hint?: string;
 
   constructor(error: any) {
-    super(error.message || 'An unknown database error occurred');
+    // Map common Supabase error messages to user-friendly messages
+    const userFriendlyMessage = SupabaseError.getUserFriendlyMessage(error);
+    
+    super(userFriendlyMessage || error.message || 'An unknown database error occurred');
     this.name = 'SupabaseError';
     this.code = error.code || 'UNKNOWN_ERROR';
     this.details = error.details || null;
@@ -144,6 +149,46 @@ export class SupabaseError extends Error {
 
   public isPermissionError(): boolean {
     return ['INSUFFICIENT_PRIVILEGE', 'ROW_LEVEL_SECURITY_VIOLATION'].includes(this.code);
+  }
+
+  // Map Supabase errors to user-friendly messages
+  private static getUserFriendlyMessage(error: any): string | null {
+    const message = error.message?.toLowerCase() || '';
+    
+    // Authentication error mappings
+    if (message.includes('invalid login credentials') || 
+        message.includes('email not confirmed') ||
+        message.includes('invalid email or password')) {
+      return 'Invalid email or password. Please check your credentials and try again.';
+    }
+    
+    if (message.includes('email already registered') || 
+        message.includes('user already registered')) {
+      return 'An account with this email already exists. Please sign in instead.';
+    }
+    
+    if (message.includes('password should be at least')) {
+      return 'Password must be at least 6 characters long.';
+    }
+    
+    if (message.includes('invalid email')) {
+      return 'Please enter a valid email address.';
+    }
+    
+    if (message.includes('rate limit') || message.includes('too many requests')) {
+      return 'Too many login attempts. Please wait a moment and try again.';
+    }
+    
+    if (message.includes('network') || message.includes('connection')) {
+      return 'Connection error. Please check your internet connection and try again.';
+    }
+    
+    if (message.includes('service unavailable')) {
+      return 'Service is temporarily unavailable. Please try again later.';
+    }
+    
+    // Return null to use the original message if no mapping found
+    return null;
   }
 }
 

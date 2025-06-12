@@ -1,0 +1,114 @@
+{
+  "title": "Checkout",
+  "subtitle": "Complete your jewelry order",
+  "steps": {
+    "cart": "Cart Review",
+    "shipping": "Shipping",
+    "payment": "Payment",
+    "confirmation": "Confirmation"
+  },
+  "cart": {
+    "title": "Shopping Cart",
+    "itemCount": "{{count}} item",
+    "itemCount_plural": "{{count}} items",
+    "by": "by",
+    "sku": "SKU",
+    "customization": {
+      "size": "Size",
+      "engraving": "Engraving",
+      "metal": "Metal",
+      "gemstone": "Gemstone",
+      "notes": "Notes"
+    },
+    "leadTime": "{{days}} days lead time",
+    "remove": "Remove",
+    "continue": "Proceed to Shipping",
+    "summary": {
+      "title": "Order Summary",
+      "subtotal": "Subtotal",
+      "shipping": "Shipping",
+      "freeShipping": "Free",
+      "tax": "Tax (VAT)",
+      "total": "Total"
+    },
+    "estimatedDelivery": "Estimated delivery: {{date}}",
+    "empty": {
+      "title": "Your cart is empty",
+      "description": "Add some beautiful jewelry to your cart to continue.",
+      "browseProducts": "Browse Products"
+    }
+  },
+  "shipping": {
+    "title": "Shipping Information",
+    "placeholder": "Shipping form will be implemented in the next step.",
+    "address": {
+      "title": "Shipping Address",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "company": "Company (Optional)",
+      "address1": "Address Line 1",
+      "address2": "Address Line 2 (Optional)",
+      "city": "City",
+      "state": "State/Province",
+      "postalCode": "Postal Code",
+      "country": "Country",
+      "phone": "Phone Number (Optional)"
+    },
+    "billing": {
+      "title": "Billing Address",
+      "sameAsShipping": "Same as shipping address"
+    },
+    "methods": {
+      "title": "Shipping Method",
+      "standard": "Standard Shipping",
+      "express": "Express Shipping",
+      "overnight": "Overnight Shipping"
+    }
+  },
+  "payment": {
+    "title": "Payment Information",
+    "placeholder": "Payment integration will be implemented in the next step.",
+    "methods": {
+      "title": "Payment Method",
+      "stripe": "Credit/Debit Card (Stripe)",
+      "payplus": "Israeli Payment Methods (PayPlus)"
+    },
+    "cardDetails": {
+      "cardNumber": "Card Number",
+      "expiryDate": "Expiry Date",
+      "cvv": "CVV",
+      "cardholderName": "Cardholder Name"
+    },
+    "billingAddress": "Billing Address",
+    "processing": "Processing Payment...",
+    "secure": "Your payment information is secure and encrypted"
+  },
+  "confirmation": {
+    "title": "Order Confirmed!",
+    "placeholder": "Order confirmation details will be displayed here.",
+    "orderId": "Order ID",
+    "thankYou": "Thank you for your order",
+    "emailSent": "A confirmation email has been sent to your email address.",
+    "trackOrder": "Track Your Order",
+    "continueShopping": "Continue Shopping",
+    "orderDetails": {
+      "title": "Order Details",
+      "items": "Items",
+      "shipping": "Shipping Address",
+      "payment": "Payment Method",
+      "summary": "Order Summary"
+    }
+  },
+  "emptyCart": {
+    "title": "Your cart is empty",
+    "description": "Add some items to your cart before proceeding to checkout.",
+    "browseProducts": "Browse Products"
+  },
+  "errors": {
+    "productNotFound": "Product not found or unavailable",
+    "paymentFailed": "Payment failed. Please try again.",
+    "shippingRequired": "Please provide shipping information",
+    "addressInvalid": "Please check your address information",
+    "paymentRequired": "Please select a payment method"
+  }
+}

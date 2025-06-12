@@ -23,7 +23,10 @@
     "download": "הורד",
     "upload": "העלה",
     "search": "חפש",
-    "forward": "קדימה"
+    "forward": "קדימה",
+    "continue": "המשך",
+    "finish": "סיים",
+    "retry": "נסה שוב"
   },
   "status": {
     "loading": "טוען...",
@@ -57,6 +60,24 @@
   "languages": {
     "he": "עברית",
     "en": "English"
+  },
+  "admin": {
+    "dashboard": {
+      "title": "לוח בקרה מנהל",
+      "subtitle": "סקירה וניהול המערכת"
+    },
+    "nav": {
+      "dashboard": "לוח בקרה",
+      "analytics": "אנליטיקה",
+      "users": "משתמשים",
+      "content": "תוכן",
+      "jewelers": "צורפים",
+      "orders": "הזמנות",
+      "experiments": "בדיקות A/B",
+      "monitoring": "ניטור",
+      "logs": "יומנים",
+      "settings": "הגדרות"
+    }
   },
   "formatting": {
     "demo_title": "הדגמת עיצוב ספציפי לשפה",

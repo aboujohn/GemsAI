@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase, auth, SupabaseError } from '@/lib/supabase/client';
+import { supabase, auth, SupabaseError, isDemoMode } from '@/lib/supabase/client';
 
 // Types for our authentication context
 export interface AuthUser extends User {
@@ -59,19 +59,110 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Initialize authentication state
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     async function initializeAuth() {
       try {
         console.log('Initializing auth context...');
+        console.log('Supabase client configured:', {
+          url: !!supabase,
+          hasAuth: !!supabase?.auth,
+          isClient: typeof window !== 'undefined'
+        });
+
+        // Check if we're in demo mode
+        if (isDemoMode) {
+          console.log('Running in demo mode - setting initialized state immediately');
+          if (mounted) {
+            setState(prev => ({
+              ...prev,
+              user: null,
+              session: null,
+              loading: false,
+              initialized: true,
+            }));
+          }
+          return;
+        }
+        
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession();
 
+        console.log('getSession result:', { 
+          hasSession: !!session, 
+          hasError: !!error,
+          errorMessage: error?.message 
+        });
+
         if (error) {
           console.error('Error getting session:', error);
           throw error;
         }
+
+        if (mounted) {
+          // Handle user enrichment separately
+          let enrichedUser = null;
+          if (session?.user) {
+            console.log('Enriching user data for:', session.user.email);
+            enrichedUser = await enrichUserData(session.user);
+          }
+          
+          console.log('Setting auth state:', {
+            hasSession: !!session,
+            hasUser: !!enrichedUser,
+            initialized: true,
+            loading: false
+          });
+          
+          setState(prev => ({
+            ...prev,
+            session,
+            user: enrichedUser,
+            loading: false,
+            initialized: true,
+          }));
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        if (mounted) {
+          console.log('Setting error state - no auth available');
+          setState(prev => ({
+            ...prev,
+            user: null,
+            session: null,
+            loading: false,
+            initialized: true,
+          }));
+        }
+      }
+    }
+
+    // Set a timeout to force initialization after 2 seconds
+    timeoutId = setTimeout(() => {
+      console.warn('Auth initialization timeout - forcing initialized state');
+      if (mounted && !state.initialized) {
+        setState(prev => ({
+          ...prev,
+          user: null,
+          session: null,
+          loading: false,
+          initialized: true,
+        }));
+      }
+    }, 2000);
+
+    initializeAuth();
+
+    // Listen for auth changes (skip in demo mode)
+    let unsubscribe: (() => void) | undefined;
+    
+    if (!isDemoMode) {
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state changed:', event, session);
 
         if (mounted) {
           // Handle user enrichment separately
@@ -88,64 +179,45 @@ export function AuthProvider({ children }: AuthProviderProps) {
             initialized: true,
           }));
         }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        if (mounted) {
-          setState(prev => ({
-            ...prev,
-            user: null,
-            session: null,
-            loading: false,
-            initialized: true,
-          }));
+
+        // Handle specific auth events
+        switch (event) {
+          case 'SIGNED_IN':
+            console.log('User signed in:', session?.user?.email);
+            // Force a small delay to ensure state is fully updated
+            setTimeout(() => {
+              console.log('Auth state fully updated after sign in');
+              // Trigger a custom event for components that need to respond to auth changes
+              window.dispatchEvent(new CustomEvent('auth-state-changed', {
+                detail: { authenticated: true, user: session?.user }
+              }));
+            }, 100);
+            break;
+          case 'SIGNED_OUT':
+            console.log('User signed out');
+            // Clear any cached auth state
+            localStorage.removeItem('auth_state');
+            // Trigger a custom event for sign out
+            window.dispatchEvent(new CustomEvent('auth-state-changed', {
+              detail: { authenticated: false, user: null }
+            }));
+            break;
+          case 'TOKEN_REFRESHED':
+            console.log('Token refreshed');
+            break;
+          case 'USER_UPDATED':
+            console.log('User updated');
+            break;
         }
-      }
+      });
+      
+      unsubscribe = () => subscription.unsubscribe();
     }
-
-    initializeAuth();
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session);
-
-      if (mounted) {
-        // Handle user enrichment separately
-        let enrichedUser = null;
-        if (session?.user) {
-          enrichedUser = await enrichUserData(session.user);
-        }
-        
-        setState(prev => ({
-          ...prev,
-          session,
-          user: enrichedUser,
-          loading: false,
-          initialized: true,
-        }));
-      }
-
-      // Handle specific auth events
-      switch (event) {
-        case 'SIGNED_IN':
-          console.log('User signed in:', session?.user?.email);
-          break;
-        case 'SIGNED_OUT':
-          console.log('User signed out');
-          break;
-        case 'TOKEN_REFRESHED':
-          console.log('Token refreshed');
-          break;
-        case 'USER_UPDATED':
-          console.log('User updated');
-          break;
-      }
-    });
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      clearTimeout(timeoutId);
+      unsubscribe?.();
     };
   }, []);
 
@@ -215,7 +287,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         password,
       });
 
-      if (error) throw new SupabaseError(error);
+      if (error) {
+        // Log detailed error information for debugging
+        console.error('Supabase auth error details:', {
+          message: error.message,
+          code: error.status,
+          details: error,
+        });
+        throw new SupabaseError(error);
+      }
 
       console.log('Sign in successful:', data);
     } catch (error) {

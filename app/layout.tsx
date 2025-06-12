@@ -5,6 +5,7 @@ import EnvironmentInfo from '@/components/ui/EnvironmentInfo';
 import { ThemeProvider } from '@/components/ui/ThemeProvider';
 import { LanguageProvider } from '@/components/providers/LanguageProvider';
 import { AuthProvider } from '@/lib/contexts/AuthContext';
+import { CartProvider } from '@/contexts/CartContext';
 import { config } from '@/lib/config';
 
 const geistSans = Geist({
@@ -77,10 +78,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             disableTransitionOnChange
           >
             <AuthProvider>
-              <div className="relative flex min-h-screen flex-col">
-                <main className="flex-1">{children}</main>
-              </div>
-              <EnvironmentInfo />
+              <CartProvider>
+                <div className="relative flex min-h-screen flex-col">
+                  <main className="flex-1">{children}</main>
+                </div>
+                <EnvironmentInfo />
+              </CartProvider>
             </AuthProvider>
           </ThemeProvider>
         </LanguageProvider>

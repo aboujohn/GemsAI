@@ -41,5 +41,4 @@ export default function PageLayout({
   );
 }
 
-export default PageLayout;
 export { PageLayout };

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth, useAuthForm } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -12,6 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useTranslation } from 'react-i18next';
+
+// Check if we're in demo mode (no Supabase configured)
+const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // Validation schema
 const loginSchema = z.object({
@@ -40,8 +43,8 @@ export function LoginForm({
   showCard = true,
 }: LoginFormProps) {
   const { t } = useTranslation();
-  const { signIn } = useAuth();
-  const { isLoading, error, success, handleAuthAction, clearMessages } = useAuthForm();
+  const { signIn, isAuthenticated, loading: authLoading, initialized } = useAuth();
+  const { loading, error, success, handleAuthAction, clearMessages } = useAuthForm();
   const [showPassword, setShowPassword] = useState(false);
 
   const {
@@ -55,10 +58,47 @@ export function LoginForm({
   });
 
   const onSubmit = async (data: LoginFormData) => {
+    console.log('Login form submit - Environment check:', {
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'SET' : 'NOT SET',
+      supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET',
+      isDemoMode
+    });
+    
+    if (isDemoMode) {
+      // In demo mode, show helpful message instead of trying to authenticate
+      alert('Demo Mode: Authentication is not available. This is a preview of the GemsAI interface.');
+      return;
+    }
+    
+    console.log('Attempting authentication with:', { email: data.email });
+    
     await handleAuthAction(
       async () => {
+        console.log('Calling signIn function...');
+        
+        // TEMPORARY: Test bypass for debugging redirect issue
+        if (data.email === 'test@test.com' && data.password === 'test123') {
+          console.log('Test credentials detected - simulating successful auth');
+          
+          // Simulate a successful authentication by manually calling signIn with test data
+          // This bypasses Supabase but allows us to test the redirect flow
+          
+          // Reset form first
+          reset();
+          
+          // Call onSuccess immediately to trigger redirect
+          console.log('Test auth complete, calling onSuccess');
+          onSuccess?.();
+          return;
+        }
+        
         await signIn(data.email, data.password);
+        console.log('signIn completed, resetting form...');
         reset();
+        
+        // Let the auth context handle the redirect via its state change listener
+        // Just call onSuccess to signal completion
+        console.log('SignIn successful, auth context will handle redirect');
         onSuccess?.();
       },
       t('auth.login.success', 'Login successful!')
@@ -76,6 +116,17 @@ export function LoginForm({
           {t('auth.login.subtitle', 'Enter your email and password to access your account')}
         </p>
       </div>
+
+      {/* Demo Mode Warning */}
+      {isDemoMode && (
+        <Alert variant="default" className="border-yellow-200 bg-yellow-50">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-800">
+            <strong>Demo Mode:</strong> This is a preview version. Authentication features are disabled. 
+            You can explore the interface, but account creation and login are not functional.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Messages */}
       {error && (
@@ -102,10 +153,10 @@ export function LoginForm({
             <Input
               id="email"
               type="email"
-              placeholder={t('auth.placeholders.email', 'Enter your email')}
+              placeholder={isDemoMode ? "demo@example.com (demo mode)" : t('auth.placeholders.email', 'Enter your email')}
               className="pl-10"
               {...register('email')}
-              disabled={isLoading}
+              disabled={loading}
               autoComplete="email"
               dir="ltr" // Force LTR for email input
             />
@@ -123,10 +174,10 @@ export function LoginForm({
             <Input
               id="password"
               type={showPassword ? 'text' : 'password'}
-              placeholder={t('auth.placeholders.password', 'Enter your password')}
+              placeholder={isDemoMode ? "password (demo mode)" : t('auth.placeholders.password', 'Enter your password')}
               className="pl-10 pr-10"
               {...register('password')}
-              disabled={isLoading}
+              disabled={loading}
               autoComplete="current-password"
               dir="ltr" // Force LTR for password input
             />
@@ -134,7 +185,7 @@ export function LoginForm({
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              disabled={isLoading}
+              disabled={loading}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -146,23 +197,23 @@ export function LoginForm({
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={onForgotPassword}
+            onClick={isDemoMode ? () => alert('Demo Mode: Password reset is not available.') : onForgotPassword}
             className="text-sm text-primary hover:underline"
-            disabled={isLoading}
+            disabled={loading}
           >
             {t('auth.login.forgotPassword', 'Forgot your password?')}
           </button>
         </div>
 
         {/* Submit Button */}
-        <Button type="submit" className="w-full" disabled={isLoading || !isValid}>
-          {isLoading ? (
+        <Button type="submit" className="w-full" disabled={loading || !isValid}>
+          {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               {t('auth.login.signingIn', 'Signing in...')}
             </>
           ) : (
-            t('auth.login.signIn', 'Sign In')
+            isDemoMode ? 'Try Demo (Preview Only)' : t('auth.login.signIn', 'Sign In')
           )}
         </Button>
       </form>
@@ -173,9 +224,9 @@ export function LoginForm({
           {t('auth.login.noAccount', "Don't have an account?")}{' '}
           <button
             type="button"
-            onClick={onSignUp}
+            onClick={isDemoMode ? () => alert('Demo Mode: Account creation is not available.') : onSignUp}
             className="text-primary hover:underline font-medium"
-            disabled={isLoading}
+            disabled={loading}
           >
             {t('auth.login.signUp', 'Sign up')}
           </button>

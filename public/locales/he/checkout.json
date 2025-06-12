@@ -1,0 +1,114 @@
+{
+  "title": "תשלום",
+  "subtitle": "השלם את הזמנת התכשיטים שלך",
+  "steps": {
+    "cart": "סקירת עגלה",
+    "shipping": "משלוח",
+    "payment": "תשלום",
+    "confirmation": "אישור"
+  },
+  "cart": {
+    "title": "עגלת קניות",
+    "itemCount": "פריט {{count}}",
+    "itemCount_plural": "{{count}} פריטים",
+    "by": "מאת",
+    "sku": "מק\"ט",
+    "customization": {
+      "size": "גודל",
+      "engraving": "חריטה",
+      "metal": "מתכת",
+      "gemstone": "אבן חן",
+      "notes": "הערות"
+    },
+    "leadTime": "זמן הכנה: {{days}} ימים",
+    "remove": "הסר",
+    "continue": "המשך למשלוח",
+    "summary": {
+      "title": "סיכום הזמנה",
+      "subtotal": "סכום ביניים",
+      "shipping": "משלוח",
+      "freeShipping": "חינם",
+      "tax": "מס (מע\"מ)",
+      "total": "סה\"כ"
+    },
+    "estimatedDelivery": "מועד אספקה משוער: {{date}}",
+    "empty": {
+      "title": "העגלה שלך ריקה",
+      "description": "הוסף תכשיטים יפים לעגלה כדי להמשיך.",
+      "browseProducts": "עיין במוצרים"
+    }
+  },
+  "shipping": {
+    "title": "פרטי משלוח",
+    "placeholder": "טופס המשלוח יהיה מיושם בשלב הבא.",
+    "address": {
+      "title": "כתובת משלוח",
+      "firstName": "שם פרטי",
+      "lastName": "שם משפחה",
+      "company": "חברה (אופציונלי)",
+      "address1": "כתובת שורה 1",
+      "address2": "כתובת שורה 2 (אופציונלי)",
+      "city": "עיר",
+      "state": "מדינה/מחוז",
+      "postalCode": "מיקוד",
+      "country": "מדינה",
+      "phone": "מספר טלפון (אופציונלי)"
+    },
+    "billing": {
+      "title": "כתובת לחיוב",
+      "sameAsShipping": "זהה לכתובת המשלוח"
+    },
+    "methods": {
+      "title": "שיטת משלוח",
+      "standard": "משלוח רגיל",
+      "express": "משלוח מהיר",
+      "overnight": "משלוח ללילה"
+    }
+  },
+  "payment": {
+    "title": "פרטי תשלום",
+    "placeholder": "אינטגרציה של התשלום תהיה מיושמת בשלב הבא.",
+    "methods": {
+      "title": "שיטת תשלום",
+      "stripe": "כרטיס אשראי/חיוב (Stripe)",
+      "payplus": "אמצעי תשלום ישראליים (PayPlus)"
+    },
+    "cardDetails": {
+      "cardNumber": "מספר כרטיס",
+      "expiryDate": "תאריך תפוגה",
+      "cvv": "קוד אבטחה",
+      "cardholderName": "שם בעל הכרטיס"
+    },
+    "billingAddress": "כתובת לחיוב",
+    "processing": "מעבד תשלום...",
+    "secure": "פרטי התשלום שלך מאובטחים ומוצפנים"
+  },
+  "confirmation": {
+    "title": "ההזמנה אושרה!",
+    "placeholder": "פרטי אישור ההזמנה יוצגו כאן.",
+    "orderId": "מספר הזמנה",
+    "thankYou": "תודה על הזמנתך",
+    "emailSent": "מייל אישור נשלח לכתובת הדואר האלקטרוני שלך.",
+    "trackOrder": "עקוב אחר ההזמנה",
+    "continueShopping": "המשך בקנייה",
+    "orderDetails": {
+      "title": "פרטי הזמנה",
+      "items": "פריטים",
+      "shipping": "כתובת משלוח",
+      "payment": "שיטת תשלום",
+      "summary": "סיכום הזמנה"
+    }
+  },
+  "emptyCart": {
+    "title": "העגלה שלך ריקה",
+    "description": "הוסף פריטים לעגלה לפני שתמשיך לתשלום.",
+    "browseProducts": "עיין במוצרים"
+  },
+  "errors": {
+    "productNotFound": "המוצר לא נמצא או לא זמין",
+    "paymentFailed": "התשלום נכשל. אנא נסה שוב.",
+    "shippingRequired": "אנא ספק פרטי משלוח",
+    "addressInvalid": "אנא בדוק את פרטי הכתובת",
+    "paymentRequired": "אנא בחר שיטת תשלום"
+  }
+}

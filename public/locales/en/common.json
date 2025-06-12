@@ -22,6 +22,14 @@
   "characters": "characters",
   "min": "min",
   "minutesRead": "min read",
+  "actions": {
+    "back": "Back",
+    "continue": "Continue",
+    "next": "Next",
+    "previous": "Previous",
+    "finish": "Finish",
+    "retry": "Retry"
+  },
   "nav": {
     "home": "Home",
     "dashboard": "Dashboard",
@@ -97,7 +105,10 @@
     "sort": "Sort",
     "clear": "Clear",
     "reset": "Reset",
-    "apply": "Apply"
+    "apply": "Apply",
+    "back": "Back",
+    "continue": "Continue",
+    "checkout": "Checkout"
   },
   "status": {
     "active": "Active",
@@ -154,6 +165,24 @@
   "languages": {
     "he": "עברית",
     "en": "English"
+  },
+  "admin": {
+    "dashboard": {
+      "title": "Admin Dashboard",
+      "subtitle": "System overview and management"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "analytics": "Analytics",
+      "users": "Users",
+      "content": "Content",
+      "jewelers": "Jewelers",
+      "orders": "Orders",
+      "experiments": "A/B Tests",
+      "monitoring": "Monitoring",
+      "logs": "Logs",
+      "settings": "Settings"
+    }
   },
   "formatting": {
     "demo_title": "Language-Specific Formatting Demo",

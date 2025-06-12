@@ -3,6 +3,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/Button";
 import { Icons } from "@/components/ui/Icons";
+import { CartButton } from "@/components/ui/cart-button";
 import Link from 'next/link';
 
 export const MainNavigation = () => {
@@ -61,6 +62,7 @@ export const MainNavigation = () => {
 
           {/* Business Tools */}
           <div className="flex items-center space-x-3">
+            <CartButton variant="ghost" showText={false} />
             <Link href="/dashboard">
               <Button 
                 variant="ghost" 

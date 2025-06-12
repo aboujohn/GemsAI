@@ -9,7 +9,7 @@ module.exports = {
     default: ['en'],
     he: ['en'],
   },
-  ns: ['common', 'auth', 'dashboard', 'stories', 'jewelry', 'validation'],
+  ns: ['common', 'auth', 'stories', 'story', 'dashboard', 'jewelry', 'validation', 'checkout'],
   defaultNS: 'common',
   interpolation: {
     escapeValue: false,
