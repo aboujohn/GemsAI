@@ -1,22 +1,41 @@
 ﻿'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { AuthGuard } from '@/components/providers/AuthGuard';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
-import { User, LogOut, Settings, Gem } from 'lucide-react';
+import { User, LogOut, Settings, Gem, Shield, Wrench } from 'lucide-react';
 
 function DashboardContent() {
   const { user, signOut, loading } = useAuth();
+  const router = useRouter();
 
   const handleSignOut = async () => {
     try {
       await signOut();
+      router.push('/');
     } catch (error) {
       console.error('Sign out error:', error);
     }
+  };
+
+  const handleNewStory = () => {
+    router.push('/story/new');
+  };
+
+  const handleSettings = () => {
+    router.push('/dashboard/settings');
+  };
+
+  const handleJewelerDashboard = () => {
+    router.push('/jeweler/dashboard');
+  };
+
+  const handleAdminDashboard = () => {
+    router.push('/admin');
   };
 
   if (loading) {
@@ -97,7 +116,10 @@ function DashboardContent() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card
+            className="hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={handleNewStory}
+          >
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Gem className="h-5 w-5 mr-2" />
@@ -106,11 +128,16 @@ function DashboardContent() {
               <CardDescription>Start a new jewelry customization story</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full">New Story</Button>
+              <Button className="w-full" onClick={handleNewStory}>
+                New Story
+              </Button>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card
+            className="hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={handleSettings}
+          >
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Settings className="h-5 w-5 mr-2" />
@@ -119,20 +146,26 @@ function DashboardContent() {
               <CardDescription>Manage your account and preferences</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={handleSettings}>
                 Open Settings
               </Button>
             </CardContent>
           </Card>
 
           {user?.role === 'jeweler' && (
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={handleJewelerDashboard}
+            >
               <CardHeader>
-                <CardTitle>Jeweler Tools</CardTitle>
+                <CardTitle className="flex items-center">
+                  <Wrench className="h-5 w-5 mr-2" />
+                  Jeweler Tools
+                </CardTitle>
                 <CardDescription>Access your jeweler dashboard</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="secondary" className="w-full">
+                <Button variant="secondary" className="w-full" onClick={handleJewelerDashboard}>
                   Jeweler Dashboard
                 </Button>
               </CardContent>
@@ -140,13 +173,19 @@ function DashboardContent() {
           )}
 
           {user?.role === 'admin' && (
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={handleAdminDashboard}
+            >
               <CardHeader>
-                <CardTitle>Admin Panel</CardTitle>
+                <CardTitle className="flex items-center">
+                  <Shield className="h-5 w-5 mr-2" />
+                  Admin Panel
+                </CardTitle>
                 <CardDescription>System administration tools</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="destructive" className="w-full">
+                <Button variant="destructive" className="w-full" onClick={handleAdminDashboard}>
                   Admin Dashboard
                 </Button>
               </CardContent>

@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/lib/contexts/AuthContext';
-import { isDemoMode } from '@/lib/supabase/client';
-import LoginForm from '@/components/forms/LoginForm';
-import SignUpForm from '@/components/forms/SignUpForm';
-import PasswordResetForm from '@/components/forms/PasswordResetForm';
+import { useTranslation } from '@/lib/hooks/useTranslation';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { LoginForm } from '@/components/forms/LoginForm';
+import { SignUpForm } from '@/components/forms/SignUpForm';
+import { PasswordResetForm } from '@/components/forms/PasswordResetForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Loader2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { isDemoMode } from '@/lib/supabase/client';
 
 type AuthMode = 'login' | 'signup' | 'reset';
 
@@ -19,33 +19,28 @@ export default function AuthPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [authMode, setAuthMode] = useState<AuthMode>('login');
-  const redirectingRef = useRef(false);
 
   // Get auth state without automatic redirect
   const { isAuthenticated, loading, initialized } = useAuth();
 
   // Handle demo mode redirect
   useEffect(() => {
-    if (isDemoMode && !searchParams.get('force') && !redirectingRef.current) {
+    if (isDemoMode && !searchParams.get('force')) {
       console.log('Demo mode detected, redirecting to demo page');
-      redirectingRef.current = true;
       router.replace('/story-submission-demo');
     }
-  }, []); // Remove dependencies to run only once
+  }, [router, searchParams]);
 
   // Handle redirect for authenticated users
   useEffect(() => {
-    console.log('Auth page effect triggered:', { initialized, isAuthenticated, isRedirecting: redirectingRef.current, isDemoMode });
-    
-    if (initialized && isAuthenticated && !redirectingRef.current && !isDemoMode) {
+    console.log('Auth page effect:', { initialized, isAuthenticated, isDemoMode });
+
+    if (initialized && isAuthenticated && !isDemoMode) {
       const redirectTo = searchParams.get('redirectTo') || '/dashboard';
-      console.log('User already authenticated, redirecting to:', redirectTo);
-      redirectingRef.current = true;
-      
-      // Direct redirect without delay
+      console.log('User authenticated, redirecting to:', redirectTo);
       router.replace(redirectTo);
     }
-  }, [initialized, isAuthenticated]); // Simplified dependencies
+  }, [initialized, isAuthenticated, searchParams, router]);
 
   useEffect(() => {
     // Check URL parameters for initial mode
@@ -64,18 +59,14 @@ export default function AuthPage() {
   };
 
   const handleAuthSuccess = () => {
-    // Redirect to dashboard or intended destination
-    const redirectTo = searchParams.get('redirectTo') || '/dashboard';
-    console.log('Auth success, redirecting to:', redirectTo);
-    
-    // Direct redirect
-    router.replace(redirectTo);
+    // Let the useEffect above handle the redirect
+    console.log('Auth success - redirect will be handled by useEffect');
   };
 
   // Show loading while checking authentication status
-  if (!initialized) {
+  if (!initialized || loading) {
     console.log('Auth page showing loading state:', { initialized, loading, isAuthenticated });
-    
+
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -94,19 +85,10 @@ export default function AuthPage() {
     );
   }
 
-  // Don't render auth forms if user is already authenticated (except in demo mode)
+  // If user is authenticated and not in demo mode, show redirecting message
   if (isAuthenticated && !isDemoMode) {
-    // Set redirecting state if not already set
-    if (!redirectingRef.current) {
-      const redirectTo = searchParams.get('redirectTo') || '/dashboard';
-      console.log('Setting redirect state for authenticated user to:', redirectTo);
-      redirectingRef.current = true;
-      // Use setTimeout to avoid state update during render
-      setTimeout(() => {
-        router.replace(redirectTo);
-      }, 0);
-    }
-    
+    const redirectTo = searchParams.get('redirectTo') || '/dashboard';
+
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -114,9 +96,8 @@ export default function AuthPage() {
           <p className="text-muted-foreground">{t('auth:redirecting', 'Redirecting...')}</p>
           {process.env.NODE_ENV === 'development' && (
             <div className="text-xs text-gray-500 space-y-1 mt-4">
-              <p>Debug: Authenticated and redirecting...</p>
-              <p>Redirect URL: {searchParams.get('redirectTo') || '/dashboard'}</p>
-              <p>Is Redirecting: {redirectingRef.current.toString()}</p>
+              <p>Debug: Authenticated and redirecting to {redirectTo}</p>
+              <p>Auth State: {JSON.stringify({ initialized, isAuthenticated, loading })}</p>
             </div>
           )}
         </div>
@@ -124,8 +105,9 @@ export default function AuthPage() {
     );
   }
 
+  // Render auth forms for unauthenticated users
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {authMode === 'reset' ? (
           /* Password Reset Form */

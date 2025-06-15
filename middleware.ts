@@ -1,3 +1,4 @@
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -5,130 +6,93 @@ import type { NextRequest } from 'next/server';
  * Middleware for authentication and runtime environment verification
  * Handles route protection and environment checks
  */
-export async function middleware(request: NextRequest) {
-  const response = NextResponse.next();
 
+// Define the paths that should be handled by middleware
+const PROTECTED_PATHS = ['/dashboard', '/story', '/profile', '/settings'];
+const ROLE_BASED_PATHS = {
+  '/dashboard/admin': ['admin'],
+  '/dashboard/jeweler': ['jeweler', 'admin'],
+};
+const PUBLIC_ONLY_PATHS = ['/auth'];
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Demo routes that should always be accessible
-  const demoRoutes = [
-    '/voice-demo',
-    '/text-input-demo',
-    '/transcription-demo',
-    '/story-submission-demo',
-    '/database-demo',
-    '/formatting-demo',
-    '/rtl-demo',
-    '/auth-test',
-  ];
+  console.log('🔧 MIDDLEWARE:', pathname);
 
-  // Check if current path is a demo route
-  const isDemoRoute = demoRoutes.some(route => pathname.startsWith(route));
-
-  // Allow demo routes to bypass authentication
-  if (isDemoRoute) {
-    console.log(`Demo route accessed: ${pathname}`);
-    return response;
+  // Skip middleware for static files, API routes, and Next.js internals
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/static/') ||
+    pathname.includes('.') ||
+    pathname === '/favicon.ico'
+  ) {
+    return NextResponse.next();
   }
 
-  // Check if Supabase is configured
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  // If Supabase is not configured, allow access but log warning
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase not configured - running in demo mode');
-
-    // For auth routes, redirect to demo
-    if (pathname.startsWith('/auth')) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = '/story-submission-demo';
-      redirectUrl.searchParams.set('message', 'demo-mode');
-      return NextResponse.redirect(redirectUrl);
-    }
-
-    return response;
+  // Skip middleware for demo routes
+  if (pathname.startsWith('/story-submission-demo')) {
+    return NextResponse.next();
   }
 
-  // Only import and use Supabase when it's properly configured
   try {
-    const { createMiddlewareClient } = await import('@supabase/auth-helpers-nextjs');
-
     // Create a Supabase client configured to use cookies
-    const supabase = createMiddlewareClient({ req: request, res: response });
+    const supabase = createMiddlewareClient({ req: request, res: NextResponse.next() });
 
-    // Refresh session if expired - required for Server Components
+    // Get the session
     const {
       data: { session },
+      error,
     } = await supabase.auth.getSession();
 
-    // Define protected routes that require authentication
-    const protectedRoutes = ['/dashboard', '/story', '/profile', '/settings'];
+    if (error) {
+      console.log('🔧 MIDDLEWARE SESSION ERROR:', error.message);
+    }
 
-    // Define routes that require specific roles
-    const roleBasedRoutes = {
-      '/dashboard/admin': ['admin'],
-      '/dashboard/jeweler': ['jeweler', 'admin'],
-    };
+    console.log('🔧 MIDDLEWARE SESSION:', session ? 'Has session' : 'No session');
 
-    // Define public routes that authenticated users should be redirected away from
-    const publicOnlyRoutes = ['/auth', '/auth/login', '/auth/signup', '/auth/reset-password'];
+    // TEMPORARILY DISABLE ALL REDIRECTS TO FIX AUTH LOOP
+    console.log('🔧 MIDDLEWARE: All redirects temporarily disabled');
+    return NextResponse.next();
 
-    // Check if current path is protected
-    const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
+    // The following code is commented out to prevent redirects during auth fix
+    /*
+    // Handle public-only paths (like /auth)
+    if (PUBLIC_ONLY_PATHS.some(path => pathname.startsWith(path))) {
+      if (session) {
+        console.log('🔧 MIDDLEWARE: Redirecting authenticated user from auth page');
+        const redirectTo = request.nextUrl.searchParams.get('redirectTo') || '/dashboard';
+        return NextResponse.redirect(new URL(redirectTo, request.url));
+      }
+      return NextResponse.next();
+    }
 
-    // Check if current path requires specific role
-    const requiredRoles = Object.entries(roleBasedRoutes).find(([route]) =>
-      pathname.startsWith(route)
-    )?.[1];
-
-    // Check if current path is public-only
-    const isPublicOnlyRoute = publicOnlyRoutes.some(
-      route => pathname === route || pathname.startsWith(route)
-    );
-
-    // Handle authentication logic
-    if (isProtectedRoute || requiredRoles) {
+    // Handle protected paths
+    if (PROTECTED_PATHS.some(path => pathname.startsWith(path))) {
       if (!session) {
-        // Redirect to auth page with return URL
+        console.log('🔧 MIDDLEWARE: Redirecting unauthenticated user to auth');
         const redirectUrl = new URL('/auth', request.url);
         redirectUrl.searchParams.set('redirectTo', pathname);
         return NextResponse.redirect(redirectUrl);
       }
 
       // Check role-based access
-      if (requiredRoles) {
-        const userRole = session.user?.user_metadata?.role || 'user';
-
-        if (!requiredRoles.includes(userRole)) {
-          // Redirect to dashboard if user lacks required role
+      const userRole = session.user?.user_metadata?.role || 'user';
+      
+      for (const [path, allowedRoles] of Object.entries(ROLE_BASED_PATHS)) {
+        if (pathname.startsWith(path) && !allowedRoles.includes(userRole)) {
+          console.log('🔧 MIDDLEWARE: Insufficient role for path');
           return NextResponse.redirect(new URL('/dashboard', request.url));
         }
       }
     }
 
-    // Redirect authenticated users away from public-only routes
-    if (isPublicOnlyRoute && session) {
-      const redirectTo = request.nextUrl.searchParams.get('redirectTo') || '/dashboard';
-      return NextResponse.redirect(new URL(redirectTo, request.url));
-    }
-
-    // Add development headers if needed
-    if (process.env.NODE_ENV === 'development') {
-      response.headers.set('X-Environment', 'development');
-
-      // Add auth debug headers in development
-      if (session) {
-        response.headers.set('X-User-ID', session.user.id);
-        response.headers.set('X-User-Role', session.user?.user_metadata?.role || 'user');
-      }
-    }
-
-    // Return the response
-    return response;
+    return NextResponse.next();
+    */
   } catch (error) {
-    console.warn('Middleware error (fallback to demo mode):', error);
-    return response;
+    console.error('🔧 MIDDLEWARE ERROR:', error);
+    return NextResponse.next();
   }
 }
 
@@ -136,13 +100,12 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except:
+     * Match all request paths except for the ones starting with:
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
-     * - api routes (handled separately)
      */
-    '/((?!_next/static|_next/image|favicon.ico|public/|api/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
